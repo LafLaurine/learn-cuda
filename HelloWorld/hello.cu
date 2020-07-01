@@ -19,6 +19,10 @@ int main(void)
     
     // wait for the device to finish so that we see the message
     cudaDeviceSynchronize();
+
+    // check error 
+    printf("CUDA error: %s\n", cudaGetErrorString(cudaGetLastError()));
+
     return 0;
 }
 
