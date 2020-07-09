@@ -1,5 +1,6 @@
 #include <iostream>
 #include "vector3.h"
+#include "ray.h"
 
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 
@@ -13,7 +14,14 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
     }
 }
 
-__global__ void render(vector3 *fb, int max_x, int max_y) {
+// device function can only be called from other device or global functions (can't be called from host)
+__device__ vector3 color(const ray& r) {
+    vector3 unit_direction = unit_vector(r.direction());
+    float t = 0.5f*(unit_direction.y() + 1.0f);
+    return (1.0f-t)*vector3(1.0, 1.0, 1.0) + t*vector3(0.5, 0.7, 1.0);
+}
+
+__global__ void render(vector3 *fb, int max_x, int max_y, vector3 lower_left_corner, vector3 horizontal, vector3 vertical, vector3 origin) {
     // we identify the coordinates of each thread in the image (i,j)
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -23,7 +31,11 @@ __global__ void render(vector3 *fb, int max_x, int max_y) {
     fb[pixel_index + 1] = float(j) / max_y;
     fb[pixel_index + 2] = 0.2;*/
     int pixel_index = j*max_x + i;
-    fb[pixel_index] = vector3( float(i) / max_x, float(j) / max_y, 0.2f);
+    //fb[pixel_index] = vector3( float(i) / max_x, float(j) / max_y, 0.2f);
+    float u = float(i) / float(max_x);
+    float v = float(j) / float(max_y);
+    ray r(origin,lower_left_corner + u*horizontal + v*vertical);
+    fb[pixel_index] = color(r);
 }
 
 int main(void) {    
@@ -48,7 +60,7 @@ int main(void) {
     // render our buffer
     dim3 blocks(nx/tx+1,ny/ty+1);
     dim3 threads(tx,ty);
-    render<<<blocks, threads>>>(fb, nx, ny);
+    render<<<blocks, threads>>>(fb, nx, ny, vector3(-2.0, -1.0, -1.0),vector3(4.0, 0.0, 0.0),vector3(0.0, 2.0, 0.0),vector3(0.0, 0.0, 0.0));
     checkCudaErrors(cudaGetLastError());
     // cudaDeviceSynchronize lets the CPU know when the GPU is done rendering
     checkCudaErrors(cudaDeviceSynchronize());
