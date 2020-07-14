@@ -2,16 +2,16 @@
 #define RAYH
 #include "vector3.h"
 
-class ray
+class Ray
 {
     public:
-        __device__ ray() {}
-        __device__ ray(const vector3& a, const vector3& b) { A = a; B = b; }
-        __device__ vector3 origin() const       { return A; }
-        __device__ vector3 direction() const    { return B; }
-        __device__ vector3 point_at_parameter(float t) const { return A + t*B; }
-        vector3 A;
-        vector3 B;
+        __device__ Ray() {}
+        __device__ Ray(const Vector3& a, const Vector3& b) { A = a; B = b; }
+        __device__ Vector3 origin() const       { return A; }
+        __device__ Vector3 direction() const    { return B; }
+        __device__ Vector3 point_at_parameter(float t) const { return A + t*B; }
+        Vector3 A;
+        Vector3 B;
 };
 
 #endif

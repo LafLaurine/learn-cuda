@@ -6,14 +6,14 @@
 class Sphere: public Hitable {
     public:
         __device__ Sphere(){};
-        __device__ Sphere(vector3 cen, float r):center(cen), radius(r) {};
-        __device__ virtual bool hit(const ray& r, float tmin, float tmax, hit_record& rec) const;
-        vector3 center;
+        __device__ Sphere(Vector3 cen, float r):center(cen), radius(r) {};
+        __device__ virtual bool hit(const Ray& r, float tmin, float tmax, hit_record& rec) const;
+        Vector3 center;
         float radius;
 };
 
-__device__ bool Sphere::hit(const ray& r, float tmin, float tmax, hit_record& rec) const {
-    vector3 oc = r.origin() - center;
+__device__ bool Sphere::hit(const Ray& r, float tmin, float tmax, hit_record& rec) const {
+    Vector3 oc = r.origin() - center;
     float a = dot(r.direction(), r.direction());
     float b = dot(oc, r.direction());
     float c = dot(oc, oc) - radius*radius;
