@@ -30,6 +30,10 @@ __host__ __device__ inline vector3 operator+(const vector3 &v1, const vector3 &v
     return vector3(v1.e[0] + v2.e[0], v1.e[1] + v2.e[1], v1.e[2] + v2.e[2]);
 }
 
+__host__ __device__ inline vector3 operator-(const vector3 &v1, const vector3 &v2) {
+    return vector3(v1.e[0] - v2.e[0], v1.e[1] - v2.e[1], v1.e[2] - v2.e[2]);
+}
+
 __host__ __device__ inline vector3 operator/(vector3 v, float t) {
     return vector3(v.e[0]/t, v.e[1]/t, v.e[2]/t);
 }
@@ -56,6 +60,10 @@ __host__ __device__ inline vector3& vector3::operator/=(const float t) {
     e[1]  *= k;
     e[2]  *= k;
     return *this;
+}
+
+__host__ __device__ inline float dot(const vector3 &v1, const vector3 &v2) {
+    return v1.e[0] *v2.e[0] + v1.e[1] *v2.e[1]  + v1.e[2] *v2.e[2];
 }
 
 __host__ __device__ inline vector3 unit_vector(vector3 v) {
