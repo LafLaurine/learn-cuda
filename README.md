@@ -14,6 +14,9 @@ This repository has been made first for learning purpose and then for my GPGPU c
 | Github  | Jeroen Baert                         | https://github.com/Forceflow/cuda_voxelizer                     |
 | Github  | Jaegeun Han and Bharatkumar Sharma   | https://github.com/PacktPublishing/Learn-CUDA-Programming       |
 | Github  | Koichi Shiraishi                     | https://github.com/zchee/cuda-sample                            |
+| Pdf     | NVIDIA                               | https://www.nvidia.com/docs/IO/116711/sc11-cuda-c-basics.pdf    |
+| Article on Medium | Anuradha Karunarathna      | https://blog.usejournal.com/cuda-thread-indexing-fb9910cba084   |
+| Website | NVIDIA                               | https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html |
 
 ## Class ressources
 
