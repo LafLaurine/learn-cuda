@@ -1,3 +1,6 @@
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+
 #include <stdio.h>
 
 // __global__ indicates a function or "kernel" that runs on the device and is called from host code
