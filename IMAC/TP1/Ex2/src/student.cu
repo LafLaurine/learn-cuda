@@ -14,7 +14,10 @@ namespace IMAC
 {
 	__global__ void sumArraysCUDA(const int n, const int *const dev_a, const int *const dev_b, int *const dev_res)
 	{
-		/// TODO
+		int idx = blockIdx.x * blockDim.x + threadIdx.x;
+		if (idx < n) {
+			dev_res[idx] = dev_a[idx] + dev_b[idx];
+		}
 	}
 
     void studentJob(const int size, const int *const a, const int *const b, int *const res)
@@ -26,28 +29,45 @@ namespace IMAC
 		int *dev_b = NULL;
 		int *dev_res = NULL;
 
+		int block_size=4000;
+		int block_no = size/block_size;
+		dim3 dimBlock(block_size,1,1);
+		dim3 dimGrid(block_no,1,1);
+
 		// Allocate arrays on device (input and ouput)
 		const size_t bytes = size * sizeof(int);
 		std::cout 	<< "Allocating input (3 arrays): " 
 					<< ( ( 3 * bytes ) >> 20 ) << " MB on Device" << std::endl;
 		chrGPU.start();
 		
-		/// TODO
+		// allocate GPU buffers for three vectors (two input, one output)
+		cudaMalloc((void**)&dev_res, size * sizeof(int));
+		cudaMalloc((void**)&dev_a, size * sizeof(int));
+		cudaMalloc((void**)&dev_b, size * sizeof(int));
 		
 		chrGPU.stop();
 		std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
 
 		// Copy data from host to device (input arrays) 
-		/// TODO
+		cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
+		cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice);
 
 		// Launch kernel
-		/// TODO
+		//sumArraysCUDA<<<1,256>>>(size,dev_a,dev_b,dev_res);
+		//number of blocks and number of threads in a block
+		sumArraysCUDA<<<block_no,block_size>>>(size,dev_a,dev_b,dev_res);
 
-		// Copy data from device to host (output array)  
-		/// TODO
+		// cudaDeviceSynchronize waits for the kernel to finish, and returns
+		// any errors encountered during the launch.
+		cudaDeviceSynchronize();
+
+		// Copy data from device to host (output array)
+		cudaMemcpy(res, dev_res, size * sizeof(int), cudaMemcpyDeviceToHost);
 
 		// Free arrays on device
-		/// TODO
+		cudaFree(dev_a);
+		cudaFree(dev_b);
+		cudaFree(dev_res);
 	}
 }
 

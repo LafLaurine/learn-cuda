@@ -1,0 +1,1 @@
+Le max de thread par block : 1024

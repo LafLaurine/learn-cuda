@@ -20,7 +20,7 @@
 
 namespace IMAC
 {
-	const int DEFAULT_VECTOR_SIZE = 256;
+	const int DEFAULT_VECTOR_SIZE = 4096;
 
 	// Print program usage
 	void printUsageAndExit(const char *prg) 
