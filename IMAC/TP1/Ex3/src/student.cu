@@ -13,9 +13,34 @@
 
 #include "student.hpp"
 #include "chronoGPU.hpp"
+#include <algorithm>
+
+// CUDA API error checking macro
+#define cudaCheck(error) \
+    if (error != cudaSuccess) { \
+        printf("Fatal error: %s at %s:%d\n", \
+            cudaGetErrorString(error), \
+            __FILE__, __LINE__); \
+        exit(1); \
+    }
+
+#define BLOCK_SIZE 32
 
 namespace IMAC
 {
+	__global__ void applyFilter(const unsigned char* dev_input, const uint width, const uint height, unsigned char* dev_output)
+	{
+		int idx = blockIdx.x * blockDim.x + threadIdx.x;
+		int idy = blockIdx.y * blockDim.y + threadIdx.y;
+		int index = (idy * width + idx) * 3;
+		if (idx < width && idy < height){
+			//replace pixel
+			dev_output[index] = min(255.0f, (dev_input[index] * 0.393f + dev_input[index+1] * 0.769f + dev_input[index+2] * 0.189f));
+			dev_output[index+1] = min(255.0f, (dev_input[index] * 0.349f + dev_input[index+1] * 0.686f + dev_input[index+2] * 0.168f));
+			dev_output[index+2] = min(255.0f, (dev_input[index] * 0.272f + dev_input[index+1] * 0.534f + dev_input[index+2] * 0.131f));
+		}
+	} 
+
 	void studentJob(const std::vector<uchar> &input, const uint width, const uint height, std::vector<uchar> &output)
 	{
 		ChronoGPU chrGPU;
@@ -23,7 +48,32 @@ namespace IMAC
 		// 2 arrays for GPU
 		uchar *dev_input = NULL;
 		uchar *dev_output = NULL;
+
+		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
+		dim3 numBlocks(ceil((float)width / threadsPerBlock.x), ceil((float)height/threadsPerBlock.y));
 		
-		/// TODOOOOOOOOOOOOOO
+		chrGPU.start();
+
+		// allocate GPU buffers
+		cudaCheck(cudaMalloc((void**)&dev_input, width * height * 3 * sizeof(uchar)));
+		cudaCheck(cudaMalloc((void**)&dev_output, width * height * 3 * sizeof(uchar)));
+
+		chrGPU.stop();
+		std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
+		
+		// Copy data from host to device (input arrays) 
+		cudaCheck(cudaMemcpy(dev_input, input.data(), (width * height * 3) * sizeof(uchar), cudaMemcpyHostToDevice));
+
+		//launch kernel
+		applyFilter<<<numBlocks,threadsPerBlock>>>(dev_input,width,height,dev_output);
+
+		//cudaCheck(cudaDeviceSynchronize());
+
+ 		// Copy data from device to host (output array)
+		cudaCheck(cudaMemcpy(output.data(), dev_output, (width * height * 3) * sizeof(uchar), cudaMemcpyDeviceToHost));
+
+		// Free arrays on device
+		cudaFree(dev_output);
+		cudaFree(dev_input);
 	}
 }
