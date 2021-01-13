@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 project(learn-cuda)
 
 # Set standards
@@ -11,3 +11,4 @@ include_directories(${CUDAToolkit_INCLUDE_DIRS})
 
 # Get projects
 add_subdirectory(Personal)
+add_subdirectory(IMAC)
