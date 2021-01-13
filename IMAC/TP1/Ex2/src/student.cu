@@ -9,7 +9,7 @@
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include <vector>
+
 #include <iostream>
 
 #include "student.hpp"
@@ -19,7 +19,8 @@ namespace IMAC
 {
 	__global__ void sumArraysCUDA(const int n, const int *const dev_a, const int *const dev_b, int *const dev_res)
 	{
-		dev_res[threadIdx.x] = dev_a[threadIdx.x] + dev_b[threadIdx.x];
+		int idx = blockIdx.x * blockDim.x + threadIdx.x;
+		dev_res[idx] = dev_a[idx] + dev_b[idx];
 	}
 
     void studentJob(const int size, const int *const a, const int *const b, int *const res)
@@ -49,7 +50,8 @@ namespace IMAC
 		cudaMemcpy(dev_b, b, bytes, cudaMemcpyHostToDevice);
 
 		// Launch kernel
-		sumArraysCUDA<<<1, 256>>>(size, dev_a, dev_b, dev_res);
+		int blocks = size / 512;
+		sumArraysCUDA<<<blocks, 512>>>(size, dev_a, dev_b, dev_res);
 
 		// Copy data from device to host (output array)  
 		cudaMemcpy(res, dev_res, bytes, cudaMemcpyDeviceToHost);
