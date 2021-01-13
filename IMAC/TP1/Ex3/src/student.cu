@@ -35,7 +35,8 @@ namespace IMAC
 		cudaMemcpy(dev_input, input.data(), bytes, cudaMemcpyHostToDevice);
 
 		// Launch kernel
-		sepiaImageCUDA<<<1, 256>>>(width, height, dev_input, dev_output);
+		int blocks = (width * height * 3) / 512;
+		sepiaImageCUDA<<<blocks, 512>>>(width, height, dev_input, dev_output);
 
 		// Copy data from device to host
 		cudaMemcpy(output.data(), dev_output, bytes, cudaMemcpyDeviceToHost);
