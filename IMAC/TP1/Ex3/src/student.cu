@@ -16,7 +16,7 @@ namespace IMAC
 	{
 		uint x = (blockIdx.x * blockDim.x) + threadIdx.x;
 		uint y = (blockIdx.y * blockDim.y) + threadIdx.y;
-		uint idx = y * width + x;
+		uint idx = (y * width + x) * 3;
 		if (idx < width * height * 3)
 		{
 			const unsigned char r = dev_input[idx];
