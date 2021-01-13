@@ -6,40 +6,40 @@
 # $(BIN) est la nom du binaire généré
 BIN=deviceProperties
 # FLAG
-FLAGS=
+FLAGS=-Wall -O3
 FLAGS_NVCC=-gencode=arch=compute_50,code=sm_50
 # INCLUDES
-INC=-I"C:\Program Files (x86)\Windows Kits\10\Include\10.0.16299.0\ucrt" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\include" -I"C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.15.26726\include"
+INC=-I/usr/local/cuda/include
 # SRC Directory
 SRC=src
 # Librairies directory
-LIBDIR=-L"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\um\x64" -L"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.16299.0\ucrt\x64"
+LIBDIR=
 # Librairies
 LIBS=-lcuda -lcudart
 # Librairies
 OBJDIR=obj
 # OBJET Directory
 NVCC=nvcc
-GPP=cl
-
+GPP=g++
 # $(OBJECTS) sont les objets des fichiers C / C++ standard qui seront générés après la compilation
-OBJECTS=$(OBJDIR)\main.obj
+OBJECTS=$(OBJDIR)/main.o
 # $(OBJECTS_CUDA) sont les objets des fichiers contenant du CUDA (.cu)
-OBJECTS_CUDA=$(OBJDIR)\deviceProperties.cu.obj
+OBJECTS_CUDA=$(OBJDIR)/deviceProperties.cu.o
 
 all: $(OBJECTS) $(OBJECTS_CUDA)
 	@echo "**** PHASE DE LIEN ****"
-	$(NVCC) $(LIBDIR) $(LIBS) $(INC) $(OBJECTS) $(OBJECTS_CUDA) -o $(BIN)
+	$(NVCC) $(LIBDIR) $(LIBS) $(OBJECTS) $(OBJECTS_CUDA) -o $(BIN)
 
-$(OBJDIR)\\%.obj: $(SRC)\%.cpp
+$(OBJDIR)/%.o: $(SRC)/%.cpp
 	@echo "**** $@ ****"
-	$(GPP) $(INC) $(FLAGS) -c $< /Fo$@
+	$(GPP) $(INC) $(FLAGS) -c $< -o $@
 
-$(OBJDIR)\\%.cu.obj: $(SRC)\%.cu
+$(OBJDIR)/%.cu.o: $(SRC)/%.cu
 	@echo "**** $@ ****"
 	$(NVCC) $(FLAGS_NVCC) $(INC) -c $< -o $@
 
 clean:
-	- del $(OBJDIR)\*.obj
-	- del $(BIN).exe
+	- rm $(OBJDIR)/*.o
+	- rm $(BIN)
+
 
