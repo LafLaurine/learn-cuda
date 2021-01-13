@@ -29,10 +29,8 @@ namespace IMAC
 		int *dev_b = NULL;
 		int *dev_res = NULL;
 
-		int block_size=4000;
-		int block_no = size/block_size;
-		dim3 dimBlock(block_size,1,1);
-		dim3 dimGrid(block_no,1,1);
+		int thr_per_blk = 256;
+		int blk_in_grid = ceil(float(size) / thr_per_blk);
 
 		// Allocate arrays on device (input and ouput)
 		const size_t bytes = size * sizeof(int);
@@ -55,7 +53,7 @@ namespace IMAC
 		// Launch kernel
 		//sumArraysCUDA<<<1,256>>>(size,dev_a,dev_b,dev_res);
 		//number of blocks and number of threads in a block
-		sumArraysCUDA<<<block_no,block_size>>>(size,dev_a,dev_b,dev_res);
+		sumArraysCUDA<<<blk_in_grid, thr_per_blk>>>(size,dev_a,dev_b,dev_res);
 
 		// cudaDeviceSynchronize waits for the kernel to finish, and returns
 		// any errors encountered during the launch.
