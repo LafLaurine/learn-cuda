@@ -67,9 +67,9 @@ namespace IMAC
 		cudaMemcpy(res, dev_res, size * sizeof(int), cudaMemcpyDeviceToHost);
 
 		// Free arrays on device
-		cudaFree(dev_a);
-		cudaFree(dev_b);
 		cudaFree(dev_res);
+		cudaFree(dev_b);
+		cudaFree(dev_a);
 	}
 }
 
