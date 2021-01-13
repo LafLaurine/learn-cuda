@@ -7,6 +7,10 @@
 * Author: Maxime MARIA
 */
 
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+
 #include "student.hpp"
 #include "chronoGPU.hpp"
 
