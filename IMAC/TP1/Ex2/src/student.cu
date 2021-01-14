@@ -43,16 +43,16 @@ namespace IMAC
 		chrGPU.start();
 		
 		// allocate GPU buffers for three vectors (two input, one output)
-		cudaMalloc((void**)&dev_res, size * sizeof(int));
-		cudaMalloc((void**)&dev_a, size * sizeof(int));
-		cudaMalloc((void**)&dev_b, size * sizeof(int));
+		cudaMalloc((void**)&dev_res, bytes);
+		cudaMalloc((void**)&dev_a, bytes);
+		cudaMalloc((void**)&dev_b, bytes);
 		
 		chrGPU.stop();
 		std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
 
 		// Copy data from host to device (input arrays) 
-		cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
-		cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice);
+		cudaMemcpy(dev_a, a, bytes, cudaMemcpyHostToDevice);
+		cudaMemcpy(dev_b, b, bytes, cudaMemcpyHostToDevice);
 
 		// Launch kernel
 		//sumArraysCUDA<<<1,256>>>(size,dev_a,dev_b,dev_res);
@@ -64,7 +64,7 @@ namespace IMAC
 		cudaDeviceSynchronize();
 
 		// Copy data from device to host (output array)
-		cudaMemcpy(res, dev_res, size * sizeof(int), cudaMemcpyDeviceToHost);
+		cudaMemcpy(res, dev_res, bytes, cudaMemcpyDeviceToHost);
 
 		// Free arrays on device
 		cudaFree(dev_res);
