@@ -15,15 +15,6 @@
 #include "chronoGPU.hpp"
 #include <algorithm>
 
-// CUDA API error checking macro
-#define cudaCheck(error) \
-    if (error != cudaSuccess) { \
-        printf("Fatal error: %s at %s:%d\n", \
-            cudaGetErrorString(error), \
-            __FILE__, __LINE__); \
-        exit(1); \
-    }
-
 #define BLOCK_SIZE 32
 
 namespace IMAC
@@ -55,22 +46,22 @@ namespace IMAC
 		chrGPU.start();
 
 		// allocate GPU buffers
-		cudaCheck(cudaMalloc((void**)&dev_input, width * height * 3 * sizeof(uchar)));
-		cudaCheck(cudaMalloc((void**)&dev_output, width * height * 3 * sizeof(uchar)));
+		HANDLE_ERROR(cudaMalloc((void**)&dev_input, width * height * 3 * sizeof(uchar)));
+		HANDLE_ERROR(cudaMalloc((void**)&dev_output, width * height * 3 * sizeof(uchar)));
 
 		chrGPU.stop();
 		std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
 		
 		// Copy data from host to device (input arrays) 
-		cudaCheck(cudaMemcpy(dev_input, input.data(), (width * height * 3) * sizeof(uchar), cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy(dev_input, input.data(), (width * height * 3) * sizeof(uchar), cudaMemcpyHostToDevice));
 
 		//launch kernel
 		applyFilter<<<numBlocks,threadsPerBlock>>>(dev_input,width,height,dev_output);
 
-		//cudaCheck(cudaDeviceSynchronize());
+		//HANDLE_ERROR(cudaDeviceSynchronize());
 
  		// Copy data from device to host (output array)
-		cudaCheck(cudaMemcpy(output.data(), dev_output, (width * height * 3) * sizeof(uchar), cudaMemcpyDeviceToHost));
+		HANDLE_ERROR(cudaMemcpy(output.data(), dev_output, (width * height * 3) * sizeof(uchar), cudaMemcpyDeviceToHost));
 
 		// Free arrays on device
 		cudaFree(dev_output);
