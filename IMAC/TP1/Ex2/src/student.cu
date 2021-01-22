@@ -33,22 +33,19 @@ namespace IMAC
 		int *dev_b = NULL;
 		int *dev_res = NULL;
 
-		int thr_per_blk = 256;
+		int thr_per_blk = 512;
 		int blk_in_grid = ceil(float(size) / thr_per_blk);
 
 		// Allocate arrays on device (input and ouput)
 		const size_t bytes = size * sizeof(int);
 		std::cout 	<< "Allocating input (3 arrays): " 
 					<< ( ( 3 * bytes ) >> 20 ) << " MB on Device" << std::endl;
-		chrGPU.start();
 		
 		// allocate GPU buffers for three vectors (two input, one output)
 		cudaMalloc((void**)&dev_res, bytes);
 		cudaMalloc((void**)&dev_a, bytes);
 		cudaMalloc((void**)&dev_b, bytes);
 		
-		chrGPU.stop();
-		std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
 
 		// Copy data from host to device (input arrays) 
 		cudaMemcpy(dev_a, a, bytes, cudaMemcpyHostToDevice);
@@ -57,7 +54,11 @@ namespace IMAC
 		// Launch kernel
 		//sumArraysCUDA<<<1,256>>>(size,dev_a,dev_b,dev_res);
 		//number of blocks and number of threads in a block
+		chrGPU.start();
 		sumArraysCUDA<<<blk_in_grid, thr_per_blk>>>(size,dev_a,dev_b,dev_res);
+		chrGPU.stop();
+
+		std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
 
 		// cudaDeviceSynchronize waits for the kernel to finish, and returns
 		// any errors encountered during the launch.

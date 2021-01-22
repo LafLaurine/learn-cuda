@@ -43,20 +43,20 @@ namespace IMAC
 		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
 		dim3 numBlocks(ceil((float)width / threadsPerBlock.x), ceil((float)height/threadsPerBlock.y));
 		
-		chrGPU.start();
 
 		// allocate GPU buffers
 		HANDLE_ERROR(cudaMalloc((void**)&dev_input, width * height * 3 * sizeof(uchar)));
 		HANDLE_ERROR(cudaMalloc((void**)&dev_output, width * height * 3 * sizeof(uchar)));
-
-		chrGPU.stop();
-		std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
 		
 		// Copy data from host to device (input arrays) 
 		HANDLE_ERROR(cudaMemcpy(dev_input, input.data(), (width * height * 3) * sizeof(uchar), cudaMemcpyHostToDevice));
 
+		chrGPU.start();
 		//launch kernel
 		applyFilter<<<numBlocks,threadsPerBlock>>>(dev_input,width,height,dev_output);
+
+		chrGPU.stop();
+		std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
 
 		//HANDLE_ERROR(cudaDeviceSynchronize());
 

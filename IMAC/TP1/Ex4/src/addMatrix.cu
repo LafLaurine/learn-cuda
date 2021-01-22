@@ -6,10 +6,11 @@
 #include<time.h>
 
 #include "chronoGPU.hpp"
+#include "chronoCPU.hpp"
 #include "common.hpp"
 
-#define WIDTH 2
-#define HEIGHT 2
+#define WIDTH 128
+#define HEIGHT 128
 #define SIZE HEIGHT*WIDTH
 
 void createMatrix(int m[SIZE])
@@ -63,12 +64,12 @@ void GPUCompute(const int* a, const int* b, int* res) {
     cudaMemcpy(dev_a, a, bytes, cudaMemcpyHostToDevice);
     cudaMemcpy(dev_b, b, bytes, cudaMemcpyHostToDevice);
         
-    int numBlocks = 1;
-    dim3 threadsPerBlock(WIDTH*HEIGHT,HEIGHT*WIDTH);
+    dim3 threadsPerBlock(WIDTH,HEIGHT);
+    dim3 numBlocks(ceil((float)WIDTH / threadsPerBlock.x), ceil((float)HEIGHT/threadsPerBlock.y));
     chrGPU.start();
     matSum<<<numBlocks, threadsPerBlock>>>(dev_a,dev_b,dev_res);
     chrGPU.stop();
-    std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
+    std::cout 	<< "\n -> GPU Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
     cudaDeviceSynchronize();
 
     cudaMemcpy(res, dev_res, bytes, cudaMemcpyDeviceToHost);
@@ -81,13 +82,17 @@ void GPUCompute(const int* a, const int* b, int* res) {
 
 int main()
 {   
+    ChronoCPU chrCPU;
     srand(static_cast<unsigned>(time(0)));
     int m1[SIZE];
     createMatrix(m1);
     int m2[SIZE];
     createMatrix(m2);
     int mres[SIZE] = {0};
+    chrCPU.start();
     CPUCompute(m1,m2);
+    chrCPU.stop();
+    std::cout 	<< "\n -> CPU Done : " << chrCPU.elapsedTime() << " ms" << std::endl << std::endl;
     GPUCompute(m1,m2,mres);
 	return 0;
 }
