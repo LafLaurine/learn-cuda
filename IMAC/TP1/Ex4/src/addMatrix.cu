@@ -3,6 +3,7 @@
 #include <device_launch_parameters.h>
 
 #include <iostream>
+#include<time.h>
 
 #include "chronoGPU.hpp"
 #include "common.hpp"
@@ -21,17 +22,17 @@ void createMatrix(int m[SIZE])
 void matricesSum(const int m1[SIZE], const int m2[SIZE])
 {   
     int s[SIZE] = {0};
-    std::cout << "Output of the sum : " << std::endl;
+    std::cout << "Output of the sum : ";
 
     for (int ix = 0; ix < WIDTH; ix++) { 
         for (int iy = 0; iy < HEIGHT; iy++) {
             s[iy*WIDTH + ix] = m1[iy*WIDTH + ix] + m2[iy*WIDTH + ix];
-            std::cout << s[iy*WIDTH + ix] << std::endl;
+            std::cout << s[iy*WIDTH + ix] << " ";
         }
     }
 }
 
-__global__ void matSum(const int dev_a[SIZE], const int dev_b[SIZE], int dev_res[SIZE]){
+__global__ void matSum(int* dev_a, int* dev_b, int* dev_res){
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int idy = blockIdx.y * blockDim.y + threadIdx.y;
     int index = (idy * WIDTH + idx);
@@ -44,10 +45,12 @@ void CPUCompute(const int m1[SIZE], const int m2[SIZE]) {
     matricesSum(m1,m2);
 }
 
-void GPUCompute(const int a[SIZE], const int b[SIZE], int res[SIZE]) {
-    const int* dev_a[SIZE];
-    const int* dev_b[SIZE];
-    int* dev_res[SIZE];
+void GPUCompute(const int* a, const int* b, int* res) {
+    ChronoGPU chrGPU;
+
+    int* dev_a = NULL;
+    int* dev_b = NULL;
+    int* dev_res = NULL;
 
     // Allocate arrays on device (input and ouput)
     const size_t bytes = SIZE*sizeof(int);
@@ -57,18 +60,19 @@ void GPUCompute(const int a[SIZE], const int b[SIZE], int res[SIZE]) {
     cudaMalloc((void**)&dev_res, bytes);
 
     //The error lays here
-    cudaMemcpy(dev_a, &a, bytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_b, &b, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_a, a, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_b, b, bytes, cudaMemcpyHostToDevice);
         
     int numBlocks = 1;
     dim3 threadsPerBlock(WIDTH*HEIGHT,HEIGHT*WIDTH);
-    matSum<<<numBlocks, threadsPerBlock>>>(*dev_a,*dev_b,*dev_res);
+    chrGPU.start();
+    matSum<<<numBlocks, threadsPerBlock>>>(dev_a,dev_b,dev_res);
+    chrGPU.stop();
+    std::cout 	<< "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
     cudaDeviceSynchronize();
 
-    cudaMemcpy(&res, dev_res, bytes, cudaMemcpyDeviceToHost);
-
-    std::cout << *res << std::endl;
-
+    cudaMemcpy(res, dev_res, bytes, cudaMemcpyDeviceToHost);
+    
     cudaFree(dev_res);
     cudaFree(dev_b);
     cudaFree(dev_a);
@@ -77,12 +81,12 @@ void GPUCompute(const int a[SIZE], const int b[SIZE], int res[SIZE]) {
 
 int main()
 {   
+    srand(static_cast<unsigned>(time(0)));
     int m1[SIZE];
     createMatrix(m1);
     int m2[SIZE];
     createMatrix(m2);
-    int mres[SIZE];
-
+    int mres[SIZE] = {0};
     CPUCompute(m1,m2);
     GPUCompute(m1,m2,mres);
 	return 0;
