@@ -93,9 +93,10 @@ namespace IMAC
 						dY = imgHeight - 1;
 
 					const int idMat		= j * matSize + i;
-					sum.x += (float)inputImg[index].x * matConv[idMat];
-					sum.y += (float)inputImg[index].y * matConv[idMat];
-					sum.z += (float)inputImg[index].z * matConv[idMat];
+					const int idPixel	= dY * imgWidth + dX;
+					sum.x += (float)inputImg[idPixel].x * matConv[idMat];
+					sum.y += (float)inputImg[idPixel].y * matConv[idMat];
+					sum.z += (float)inputImg[idPixel].z * matConv[idMat];
 				}
 			}
 			output[index].x = (uchar)cu_clampf( sum.x, 0.f, 255.f );
