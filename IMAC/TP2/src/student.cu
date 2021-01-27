@@ -62,15 +62,9 @@ namespace IMAC
 	{
 		const uint idx = blockIdx.x * blockDim.x + threadIdx.x;
    		const uint idy = blockIdx.y * blockDim.y + threadIdx.y;
+		const uint index = idy * imgWidth + idx;
 		if (idx < imgWidth && idy < imgHeight)
 		{
-			//printf("r %d", inputImg[idx].x);
-			output[idx].x = inputImg[idx].x;
-			output[idx].y = inputImg[idx].y;
-			output[idx].z = inputImg[idx].z;
-			output[idx].w = inputImg[idx].w;
-
-			/*
 			float3 sum = make_float3(0.f,0.f,0.f);
 			// Apply convolution
 			for ( uint j = 0; j < matSize; ++j ) 
@@ -104,7 +98,6 @@ namespace IMAC
 			//output[idx].y = (uchar)clampf( sum.y, 0.f, 255.f );
 			//output[idx].z = (uchar)clampf( sum.z, 0.f, 255.f );
 			//output[idx].w = 255;
-			*/
 		}
 	}
 
@@ -126,7 +119,7 @@ namespace IMAC
 		// Allocate arrays
 		HANDLE_ERROR(cudaMalloc(&d_inputImg, sizeof(uchar4) * inputImg.size()));
 		HANDLE_ERROR(cudaMalloc(&d_matConv, sizeof(float) * matConv.size()));
-		HANDLE_ERROR(cudaMalloc(&d_output, imgWidth * imgHeight * 4));
+		HANDLE_ERROR(cudaMalloc(&d_output, sizeof(uchar4) * inputImg.size()));
 
 		// Copy data from host to device
 		HANDLE_ERROR(cudaMemcpy(d_inputImg, inputImg.data(), sizeof(uchar4) * inputImg.size(), cudaMemcpyHostToDevice));
@@ -140,7 +133,7 @@ namespace IMAC
 		HANDLE_ERROR(cudaDeviceSynchronize());
 
 		// Copy data from device to host (output array)
-		HANDLE_ERROR(cudaMemcpy(output.data(), d_output, imgWidth * imgHeight * 4, cudaMemcpyDeviceToHost));
+		HANDLE_ERROR(cudaMemcpy(output.data(), d_output, sizeof(uchar4) * inputImg.size(), cudaMemcpyDeviceToHost));
 
 		// Free arrays on device
 		HANDLE_ERROR(cudaFree(d_inputImg));
