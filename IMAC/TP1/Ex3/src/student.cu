@@ -45,6 +45,7 @@ namespace IMAC
 		cudaMemcpy(dev_input, input.data(), bytes, cudaMemcpyHostToDevice);
 
 		// Launch kernel
+		// FIXME with chuck not enough blocks. Check the rest of the division
 		int blocks = (width * height) / 512;
 		sepiaImageCUDA<<<blocks, 512>>>(width, height, dev_input, dev_output);
 
