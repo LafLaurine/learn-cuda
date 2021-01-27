@@ -58,6 +58,11 @@ namespace IMAC
 	}
 // ==================================================
 
+	__device__ float cu_clampf(const float val, const float minVal , const float maxVal)
+	{
+		return min(maxVal, max(minVal, val));
+	}
+
 	__global__ void convGPU(const uint imgWidth, const uint imgHeight, const uint matSize, uchar4* inputImg, float* matConv, uchar4* output)
 	{
 		const uint idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -71,8 +76,8 @@ namespace IMAC
 			{
 				for ( uint i = 0; i < matSize; ++i ) 
 				{
-					int dX = x + i - matSize / 2;
-					int dY = y + j - matSize / 2;
+					int dX = idx + i - matSize / 2;
+					int dY = idy + j - matSize / 2;
 
 					// Handle borders
 					if ( dX < 0 ) 
@@ -88,16 +93,15 @@ namespace IMAC
 						dY = imgHeight - 1;
 
 					const int idMat		= j * matSize + i;
-					const int idPixel	= dY * imgWidth + dX;
-					sum.x += (float)inputImg[idPixel].x * matConv[idMat];
-					sum.y += (float)inputImg[idPixel].y * matConv[idMat];
-					sum.z += (float)inputImg[idPixel].z * matConv[idMat];
+					sum.x += (float)inputImg[index].x * matConv[idMat];
+					sum.y += (float)inputImg[index].y * matConv[idMat];
+					sum.z += (float)inputImg[index].z * matConv[idMat];
 				}
 			}
-			//output[idx].x = (uchar)clampf( sum.x, 0.f, 255.f );
-			//output[idx].y = (uchar)clampf( sum.y, 0.f, 255.f );
-			//output[idx].z = (uchar)clampf( sum.z, 0.f, 255.f );
-			//output[idx].w = 255;
+			output[idx].x = (uchar)cu_clampf( sum.x, 0.f, 255.f );
+			output[idx].y = (uchar)cu_clampf( sum.y, 0.f, 255.f );
+			output[idx].z = (uchar)cu_clampf( sum.z, 0.f, 255.f );
+			output[idx].w = 255;
 		}
 	}
 
