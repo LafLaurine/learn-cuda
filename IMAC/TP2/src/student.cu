@@ -58,9 +58,47 @@ namespace IMAC
 	}
 // ==================================================
 
-	__global__ void convGPU(const uint imgWidth, const uint imgHeight, uchar4* inputImg, float* matConv, uchar4* output)
+	__global__ void convGPU(const uint imgWidth, const uint imgHeight, const uint matSize, uchar4* inputImg, float* matConv, uchar4* output)
 	{
-		printf("Hello from GPU %d \n", imgWidth);
+		uint x = (blockIdx.x * blockDim.x) + threadIdx.x;
+		uint y = (blockIdx.y * blockDim.y) + threadIdx.y;
+		uint idx = (y * imgWidth + x) * 3;
+		if (idx < imgWidth * imgHeight * 3)
+		{
+			float3 sum = make_float3(0.f,0.f,0.f);
+			// Apply convolution
+			for ( uint j = 0; j < matSize; ++j ) 
+			{
+				for ( uint i = 0; i < matSize; ++i ) 
+				{
+					int dX = x + i - matSize / 2;
+					int dY = y + j - matSize / 2;
+
+					// Handle borders
+					if ( dX < 0 ) 
+						dX = 0;
+
+					if ( dX >= imgWidth ) 
+						dX = imgWidth - 1;
+
+					if ( dY < 0 ) 
+						dY = 0;
+
+					if ( dY >= imgHeight ) 
+						dY = imgHeight - 1;
+
+					const int idMat		= j * matSize + i;
+					const int idPixel	= dY * imgWidth + dX;
+					sum.x += (float)inputImg[idPixel].x * matConv[idMat];
+					sum.y += (float)inputImg[idPixel].y * matConv[idMat];
+					sum.z += (float)inputImg[idPixel].z * matConv[idMat];
+				}
+			}
+			//output[idx].x = (uchar)clampf( sum.x, 0.f, 255.f );
+			//output[idx].y = (uchar)clampf( sum.y, 0.f, 255.f );
+			//output[idx].z = (uchar)clampf( sum.z, 0.f, 255.f );
+			//output[idx].w = 255;
+		}
 	}
 
     void studentJob(const std::vector<uchar4> &inputImg, // Input image
@@ -75,13 +113,13 @@ namespace IMAC
 
 		// 3 arrays for GPU
 		uchar4* d_inputImg = nullptr;
-		float *d_matConv = nullptr;
+		float* d_matConv = nullptr;
 		uchar4* d_output = nullptr;
 
 		// Allocate arrays
 		cudaMalloc(&d_inputImg, sizeof(uchar4) * inputImg.size());
 		cudaMalloc(&d_matConv, sizeof(float) * matConv.size());
-		cudaMalloc(&d_output, sizeof(uchar4) * output.size());
+		cudaMalloc(&d_output, sizeof(uchar4) * output.size()); // TODO check if output has the right size because might be 0
 
 		// Copy data from host to device
 		cudaMemcpy(d_inputImg, inputImg.data(), sizeof(uchar4) * inputImg.size(), cudaMemcpyHostToDevice);
@@ -89,10 +127,11 @@ namespace IMAC
 		cudaMemcpy(d_output, output.data(), sizeof(uchar4) * output.size(), cudaMemcpyHostToDevice);
 
 		// Launch kernel
-		convGPU<<<1, 1>>>(imgWidth, imgHeight, d_inputImg, d_matConv, d_output);
+		int blocks = (imgWidth * imgHeight) / 512;
+		convGPU<<<blocks, 512>>>(imgWidth, imgHeight, matSize, d_inputImg, d_matConv, d_output);
 		cudaDeviceSynchronize();
 
-		// Copy data from device to host (output array)  
+		// Copy data from device to host (output array)
 		cudaMemcpy(output.data(), d_output, sizeof(uchar4) * output.size(), cudaMemcpyDeviceToHost);
 
 		// Free arrays on device
