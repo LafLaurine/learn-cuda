@@ -7,6 +7,11 @@
 * Author: Maxime MARIA
 */
 
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+
+#include <iostream>
+
 #include "student.hpp"
 #include "chronoGPU.hpp"
 
@@ -53,6 +58,10 @@ namespace IMAC
 	}
 // ==================================================
 
+	__global__ void convGPU(const uint imgWidth, const uint imgHeight, uchar4* inputImg, float* matConv, uchar4* output)
+	{
+		printf("Hello from GPU %d \n", imgWidth);
+	}
 
     void studentJob(const std::vector<uchar4> &inputImg, // Input image
 					const uint imgWidth, const uint imgHeight, // Image size
@@ -62,6 +71,33 @@ namespace IMAC
                     std::vector<uchar4> &output // Output image
 					)
 	{
-		/// TODO !!!!!!!!!!!!!!!
+		ChronoGPU chrGPU;
+
+		// 3 arrays for GPU
+		uchar4* d_inputImg = nullptr;
+		float *d_matConv = nullptr;
+		uchar4* d_output = nullptr;
+
+		// Allocate arrays
+		cudaMalloc(&d_inputImg, sizeof(uchar4) * inputImg.size());
+		cudaMalloc(&d_matConv, sizeof(float) * matConv.size());
+		cudaMalloc(&d_output, sizeof(uchar4) * output.size());
+
+		// Copy data from host to device
+		cudaMemcpy(d_inputImg, inputImg.data(), sizeof(uchar4) * inputImg.size(), cudaMemcpyHostToDevice);
+		cudaMemcpy(d_matConv, matConv.data(), sizeof(float) * matConv.size(), cudaMemcpyHostToDevice);
+		cudaMemcpy(d_output, output.data(), sizeof(uchar4) * output.size(), cudaMemcpyHostToDevice);
+
+		// Launch kernel
+		convGPU<<<1, 1>>>(imgWidth, imgHeight, d_inputImg, d_matConv, d_output);
+		cudaDeviceSynchronize();
+
+		// Copy data from device to host (output array)  
+		cudaMemcpy(output.data(), d_output, sizeof(uchar4) * output.size(), cudaMemcpyDeviceToHost);
+
+		// Free arrays on device
+		cudaFree(d_inputImg);
+		cudaFree(d_matConv);
+		cudaFree(d_output);
 	}
 }
