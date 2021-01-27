@@ -98,10 +98,10 @@ namespace IMAC
 					sum.z += (float)inputImg[index].z * matConv[idMat];
 				}
 			}
-			output[idx].x = (uchar)cu_clampf( sum.x, 0.f, 255.f );
-			output[idx].y = (uchar)cu_clampf( sum.y, 0.f, 255.f );
-			output[idx].z = (uchar)cu_clampf( sum.z, 0.f, 255.f );
-			output[idx].w = 255;
+			output[index].x = (uchar)cu_clampf( sum.x, 0.f, 255.f );
+			output[index].y = (uchar)cu_clampf( sum.y, 0.f, 255.f );
+			output[index].z = (uchar)cu_clampf( sum.z, 0.f, 255.f );
+			output[index].w = 255;
 		}
 	}
 
