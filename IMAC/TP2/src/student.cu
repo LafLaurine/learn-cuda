@@ -60,11 +60,17 @@ namespace IMAC
 
 	__global__ void convGPU(const uint imgWidth, const uint imgHeight, const uint matSize, uchar4* inputImg, float* matConv, uchar4* output)
 	{
-		uint x = (blockIdx.x * blockDim.x) + threadIdx.x;
-		uint y = (blockIdx.y * blockDim.y) + threadIdx.y;
-		uint idx = (y * imgWidth + x) * 3;
-		if (idx < imgWidth * imgHeight * 3)
+		const uint idx = blockIdx.x * blockDim.x + threadIdx.x;
+   		const uint idy = blockIdx.y * blockDim.y + threadIdx.y;
+		if (idx < imgWidth && idy < imgHeight)
 		{
+			//printf("r %d", inputImg[idx].x);
+			output[idx].x = inputImg[idx].x;
+			output[idx].y = inputImg[idx].y;
+			output[idx].z = inputImg[idx].z;
+			output[idx].w = inputImg[idx].w;
+
+			/*
 			float3 sum = make_float3(0.f,0.f,0.f);
 			// Apply convolution
 			for ( uint j = 0; j < matSize; ++j ) 
@@ -98,6 +104,7 @@ namespace IMAC
 			//output[idx].y = (uchar)clampf( sum.y, 0.f, 255.f );
 			//output[idx].z = (uchar)clampf( sum.z, 0.f, 255.f );
 			//output[idx].w = 255;
+			*/
 		}
 	}
 
@@ -109,7 +116,7 @@ namespace IMAC
                     std::vector<uchar4> &output // Output image
 					)
 	{
-		ChronoGPU chrGPU;
+		//ChronoGPU chrGPU;
 
 		// 3 arrays for GPU
 		uchar4* d_inputImg = nullptr;
@@ -117,26 +124,27 @@ namespace IMAC
 		uchar4* d_output = nullptr;
 
 		// Allocate arrays
-		cudaMalloc(&d_inputImg, sizeof(uchar4) * inputImg.size());
-		cudaMalloc(&d_matConv, sizeof(float) * matConv.size());
-		cudaMalloc(&d_output, sizeof(uchar4) * output.size()); // TODO check if output has the right size because might be 0
+		HANDLE_ERROR(cudaMalloc(&d_inputImg, sizeof(uchar4) * inputImg.size()));
+		HANDLE_ERROR(cudaMalloc(&d_matConv, sizeof(float) * matConv.size()));
+		HANDLE_ERROR(cudaMalloc(&d_output, imgWidth * imgHeight * 4));
 
 		// Copy data from host to device
-		cudaMemcpy(d_inputImg, inputImg.data(), sizeof(uchar4) * inputImg.size(), cudaMemcpyHostToDevice);
-		cudaMemcpy(d_matConv, matConv.data(), sizeof(float) * matConv.size(), cudaMemcpyHostToDevice);
-		cudaMemcpy(d_output, output.data(), sizeof(uchar4) * output.size(), cudaMemcpyHostToDevice);
+		HANDLE_ERROR(cudaMemcpy(d_inputImg, inputImg.data(), sizeof(uchar4) * inputImg.size(), cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy(d_matConv, matConv.data(), sizeof(float) * matConv.size(), cudaMemcpyHostToDevice));
 
 		// Launch kernel
-		int blocks = (imgWidth * imgHeight) / 512;
-		convGPU<<<blocks, 512>>>(imgWidth, imgHeight, matSize, d_inputImg, d_matConv, d_output);
-		cudaDeviceSynchronize();
+		const uint BLOCK_SIZE = 32;
+		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
+        dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight/threadsPerBlock.y));
+		convGPU<<<numBlocks, threadsPerBlock>>>(imgWidth, imgHeight, matSize, d_inputImg, d_matConv, d_output);
+		HANDLE_ERROR(cudaDeviceSynchronize());
 
 		// Copy data from device to host (output array)
-		cudaMemcpy(output.data(), d_output, sizeof(uchar4) * output.size(), cudaMemcpyDeviceToHost);
+		HANDLE_ERROR(cudaMemcpy(output.data(), d_output, imgWidth * imgHeight * 4, cudaMemcpyDeviceToHost));
 
 		// Free arrays on device
-		cudaFree(d_inputImg);
-		cudaFree(d_matConv);
-		cudaFree(d_output);
+		HANDLE_ERROR(cudaFree(d_inputImg));
+		HANDLE_ERROR(cudaFree(d_matConv));
+		HANDLE_ERROR(cudaFree(d_output));
 	}
 }
