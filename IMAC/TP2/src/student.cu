@@ -103,7 +103,7 @@ namespace IMAC
 
 	__device__ __constant__ float dev_matConv[KERNEL_SIZE * KERNEL_SIZE];
 
-	__global__ void applyConvolutionv2(const unsigned char* dev_input, const uint imgWidth, const uint imgHeight,  const uint matSize, float* dev_matConvn, unsigned char* dev_output)
+	__global__ void applyConvolutionv2(const unsigned char* dev_input, const uint imgWidth, const uint imgHeight,  const uint matSize, unsigned char* dev_output)
 	{
 		int idx = blockIdx.x * blockDim.x + threadIdx.x;
 		int idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -147,7 +147,7 @@ namespace IMAC
 	texture<uchar> texRef;
 	texture<uchar,2> tex2DRef;
 
-	__global__ void applyConvolutionv3(const unsigned char* dev_input, const uint imgWidth, const uint imgHeight,  const uint matSize, float* dev_matConvn, unsigned char* dev_output)
+	__global__ void applyConvolutionv3(const uint imgWidth, const uint imgHeight,  const uint matSize, unsigned char* dev_output)
 	{
 		unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 		unsigned int idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -188,7 +188,7 @@ namespace IMAC
 		}
 	}
 
-	__global__ void applyConvolutionv4(const unsigned char* dev_input, const uint imgWidth, const uint imgHeight,  const uint matSize, float* dev_matConvn, unsigned char* dev_output)
+	__global__ void applyConvolutionv4(const uint imgWidth, const uint imgHeight,  const uint matSize, unsigned char* dev_output)
 	{
 		unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 		unsigned int idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -216,10 +216,10 @@ namespace IMAC
 						dY = imgHeight - 1;
 					
 					const int idMat = j * matSize + i;
-					const int idPixel = (dY * imgWidth + dX) * 4;
-					sum.x += (float)tex2D(tex2DRef,dY * 4,dX * 4) * dev_matConv[idMat];
-					sum.y += (float)tex2D(tex2DRef,(dY * 4) + 1, (dX*4)+1) * dev_matConv[idMat];
-					sum.z += (float)tex2D(tex2DRef,(dY * 4) + 2, (dX*4)+2) * dev_matConv[idMat];
+					const uchar c = tex2D(tex2DRef,dX,dY);
+					sum.x += (float)(c) * dev_matConv[idMat];
+					sum.y += (float)(c+1) * dev_matConv[idMat];
+					sum.z += (float)(c+2) * dev_matConv[idMat];
 				}
 			}
 			dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
@@ -238,50 +238,53 @@ namespace IMAC
                     std::vector<uchar4> &output // Output image
 					)
 	{
-		ChronoGPU chrGPU;
+		//ChronoGPU chrGPU;
 
 		// 3 arrays for GPU
 		uchar* dev_input = NULL;
-		uchar* dev_output = NULL;	
+		uchar* dev_output = NULL;
 		size_t pitch;
 		//float* dev_matConv = NULL;
-		chrGPU.start();
+		//chrGPU.start();
 		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
 		dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight/threadsPerBlock.y));
 
 		// allocate GPU buffers
-		HANDLE_ERROR(cudaMalloc((void**)&dev_input, imgWidth * imgHeight * 4 * sizeof(uchar)));
-		HANDLE_ERROR(cudaMalloc((void**)&dev_output, imgWidth * imgHeight * 4 * sizeof(uchar)));
+		//HANDLE_ERROR(cudaMalloc((void**)&dev_input, imgWidth * imgHeight * 4 * sizeof(uchar)));
+		HANDLE_ERROR(cudaMallocPitch((void**)&dev_input, &pitch, (imgWidth * 4) * sizeof(uchar), imgHeight));
+		HANDLE_ERROR(cudaMallocPitch((void**)&dev_output, &pitch, (imgWidth * 4) * sizeof(uchar), imgHeight));
+		//HANDLE_ERROR(cudaMalloc((void**)&dev_output, imgWidth * imgHeight * 4 * sizeof(uchar)));
 		//HANDLE_ERROR(cudaMalloc((void**)&dev_matConv, matSize * matSize * sizeof(float)));
-		HANDLE_ERROR(cudaMallocPitch((void**)&dev_input, &pitch, (imgWidth * 4) * sizeof(uchar), (imgHeight * 4) * sizeof(uchar)));
 
 		HANDLE_ERROR(cudaMemcpyToSymbol(dev_matConv, matConv.data(), matSize*matSize*sizeof(float)));
 		
 		// Copy data from host to device (input arrays) 
 		//HANDLE_ERROR(cudaMemcpy(dev_input, inputImg.data(), (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyHostToDevice));
 		//HANDLE_ERROR(cudaMemcpy(dev_matConv, matConv.data(), matSize * matSize * sizeof(float), cudaMemcpyHostToDevice));
-		HANDLE_ERROR(cudaMemcpy2D(dev_input, pitch, inputImg.data(), pitch, imgWidth, imgHeight, cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy2D(dev_input, pitch, inputImg.data(),  imgWidth * 4 * sizeof(uchar),  imgWidth * 4 * sizeof(uchar),  imgHeight, cudaMemcpyHostToDevice));
 
 		//HANDLE_ERROR(cudaBindTexture(NULL, texRef, dev_input,  imgWidth * imgHeight * 4 * sizeof(uchar)));
-		HANDLE_ERROR(cudaBindTexture2D(NULL, tex2DRef, dev_input,  imgWidth * 4 * sizeof(uchar), imgHeight * 4 * sizeof(uchar), pitch));
+		HANDLE_ERROR(cudaBindTexture2D(NULL, tex2DRef, dev_input,  imgWidth * 4 * sizeof(uchar), imgHeight, pitch));
 
 		//launch kernel
 		//applyConvolution<<<numBlocks,threadsPerBlock>>>(dev_input,imgWidth,imgHeight,matSize,dev_matConv,dev_output);
-		//applyConvolutionv2<<<numBlocks,threadsPerBlock>>>(dev_input,imgWidth,imgHeight,matSize,dev_matConv,dev_output);
-		//applyConvolutionv3<<<numBlocks,threadsPerBlock>>>(dev_input,imgWidth,imgHeight,matSize,dev_matConv,dev_output);
-		applyConvolutionv4<<<numBlocks,threadsPerBlock>>>(dev_input,imgWidth,imgHeight,matSize,dev_matConv,dev_output);
+		//applyConvolutionv2<<<numBlocks,threadsPerBlock>>>(dev_input,imgWidth,imgHeight,matSize,dev_output);
+		//applyConvolutionv3<<<numBlocks,threadsPerBlock>>>(imgWidth,imgHeight,matSize,dev_output);
+		applyConvolutionv4<<<numBlocks,threadsPerBlock>>>(imgWidth,imgHeight,matSize,dev_output);
 
-		chrGPU.stop();
-		std::cout << "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
+		//chrGPU.stop();
+		//std::cout << "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
 
 		HANDLE_ERROR(cudaDeviceSynchronize());
  		// Copy data from device to host (output array)
-		HANDLE_ERROR(cudaMemcpy(output.data(), dev_output, (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyDeviceToHost));
+		//HANDLE_ERROR(cudaMemcpy(output.data(), dev_output, (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyDeviceToHost));
+		HANDLE_ERROR(cudaMemcpy2D(output.data(), imgWidth * 4 * sizeof(uchar), dev_output, pitch, imgWidth * 4 * sizeof(uchar), imgHeight, cudaMemcpyDeviceToHost));
 
 		HANDLE_ERROR(cudaUnbindTexture(texRef));
+		HANDLE_ERROR(cudaUnbindTexture(tex2DRef));
 		// Free arrays on device
 		HANDLE_ERROR(cudaFree(dev_output));
-		//cudaFree(dev_matConv);
+		//HANDLE_ERROR(cudaFree(dev_matConv));
 		HANDLE_ERROR(cudaFree(dev_input));
 	}
 }
