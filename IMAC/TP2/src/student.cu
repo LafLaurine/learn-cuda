@@ -144,8 +144,8 @@ namespace IMAC
 		}
 	}
 
-	texture<uchar> texRef;
-	texture<uchar,2> tex2DRef;
+	texture<uchar,1,cudaReadModeElementType> texRef;
+	texture<uchar,2,cudaReadModeElementType> tex2DRef;
 
 	__global__ void applyConvolutionv3(const uint imgWidth, const uint imgHeight,  const uint matSize, unsigned char* dev_output)
 	{
@@ -229,8 +229,139 @@ namespace IMAC
 		}
 	}
 
+	
+    void studentJob1(const std::vector<uchar4> &inputImg, // Input image
+		const uint imgWidth, const uint imgHeight, // Image size
+		const std::vector<float> &matConv, // Convolution matrix (square)
+		const uint matSize, // Matrix size (width or height)
+		const std::vector<uchar4> &resultCPU, // Just for comparison
+		std::vector<uchar4> &output // Output image
+		)
+	{
+		ChronoGPU chrGPU;
 
-    void studentJob(const std::vector<uchar4> &inputImg, // Input image
+		// 3 arrays for GPU
+		uchar* dev_input = NULL;
+		uchar* dev_output = NULL;
+		float* dev_matConv = NULL;
+		chrGPU.start();
+		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
+		dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight/threadsPerBlock.y));
+
+		// allocate GPU buffers
+		HANDLE_ERROR(cudaMalloc((void**)&dev_input, imgWidth * imgHeight * 4 * sizeof(uchar)));
+		HANDLE_ERROR(cudaMalloc((void**)&dev_output, imgWidth * imgHeight * 4 * sizeof(uchar)));
+		HANDLE_ERROR(cudaMalloc((void**)&dev_matConv, matSize * matSize * sizeof(float)));
+
+		// Copy data from host to device (input arrays) 
+		HANDLE_ERROR(cudaMemcpy(dev_input, inputImg.data(), (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy(dev_matConv, matConv.data(), matSize * matSize * sizeof(float), cudaMemcpyHostToDevice));
+
+		//launch kernel
+		applyConvolution<<<numBlocks,threadsPerBlock>>>(dev_input,imgWidth,imgHeight,matSize,dev_matConv,dev_output);
+
+		chrGPU.stop();
+		std::cout << "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
+
+		HANDLE_ERROR(cudaDeviceSynchronize());
+		
+		// Copy data from device to host (output array)
+		HANDLE_ERROR(cudaMemcpy(output.data(), dev_output, (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyDeviceToHost));
+
+		// Free arrays on device
+		HANDLE_ERROR(cudaFree(dev_output));
+		HANDLE_ERROR(cudaFree(dev_matConv));
+		HANDLE_ERROR(cudaFree(dev_input));
+	}
+
+	void studentJob2(const std::vector<uchar4> &inputImg, // Input image
+		const uint imgWidth, const uint imgHeight, // Image size
+		const std::vector<float> &matConv, // Convolution matrix (square)
+		const uint matSize, // Matrix size (width or height)
+		const std::vector<uchar4> &resultCPU, // Just for comparison
+		std::vector<uchar4> &output // Output image
+		)
+	{
+		ChronoGPU chrGPU;
+
+		// 3 arrays for GPU
+		uchar* dev_input = NULL;
+		uchar* dev_output = NULL;
+
+		chrGPU.start();
+		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
+		dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight/threadsPerBlock.y));
+
+		// allocate GPU buffers
+		HANDLE_ERROR(cudaMalloc((void**)&dev_input, imgWidth * imgHeight * 4 * sizeof(uchar)));
+		HANDLE_ERROR(cudaMalloc((void**)&dev_output, imgWidth * imgHeight * 4 * sizeof(uchar)));
+
+		// Copy data from host to device (input arrays) 
+		HANDLE_ERROR(cudaMemcpyToSymbol(dev_matConv, matConv.data(), matSize*matSize*sizeof(float)));
+		HANDLE_ERROR(cudaMemcpy(dev_input, inputImg.data(), (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyHostToDevice));
+
+		//launch kernel
+		applyConvolutionv2<<<numBlocks,threadsPerBlock>>>(dev_input,imgWidth,imgHeight,matSize,dev_output);
+
+		chrGPU.stop();
+		std::cout << "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
+
+		HANDLE_ERROR(cudaDeviceSynchronize());
+		
+		// Copy data from device to host (output array)
+		HANDLE_ERROR(cudaMemcpy(output.data(), dev_output, (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyDeviceToHost));
+
+		// Free arrays on device
+		HANDLE_ERROR(cudaFree(dev_output));
+		HANDLE_ERROR(cudaFree(dev_input));
+	}
+
+	void studentJob3(const std::vector<uchar4> &inputImg, // Input image
+		const uint imgWidth, const uint imgHeight, // Image size
+		const std::vector<float> &matConv, // Convolution matrix (square)
+		const uint matSize, // Matrix size (width or height)
+		const std::vector<uchar4> &resultCPU, // Just for comparison
+		std::vector<uchar4> &output // Output image
+		)
+	{
+		ChronoGPU chrGPU;
+
+		// 3 arrays for GPU
+		uchar* dev_input = NULL;
+		uchar* dev_output = NULL;
+
+		chrGPU.start();
+		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
+		dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight/threadsPerBlock.y));
+
+		// allocate GPU buffers
+		HANDLE_ERROR(cudaMalloc((void**)&dev_input, imgWidth * imgHeight * 4 * sizeof(uchar)));
+		HANDLE_ERROR(cudaMalloc((void**)&dev_output, imgWidth * imgHeight * 4 * sizeof(uchar)));
+
+		// Copy data from host to device (input arrays) 
+		HANDLE_ERROR(cudaMemcpyToSymbol(dev_matConv, matConv.data(), matSize*matSize*sizeof(float)));
+
+		// bind texture
+		HANDLE_ERROR(cudaBindTexture(NULL, texRef, dev_input,  imgWidth * imgHeight * 4 * sizeof(uchar)));
+
+		//launch kernel
+		applyConvolutionv3<<<numBlocks,threadsPerBlock>>>(imgWidth,imgHeight,matSize,dev_output);
+
+		chrGPU.stop();
+		std::cout << "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
+
+		HANDLE_ERROR(cudaDeviceSynchronize());
+
+		// Copy data from device to host (output array)
+		HANDLE_ERROR(cudaMemcpy(output.data(), dev_output, (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyDeviceToHost));
+
+		// Free arrays on device
+		HANDLE_ERROR(cudaUnbindTexture(texRef));
+		HANDLE_ERROR(cudaFree(dev_output));
+		HANDLE_ERROR(cudaFree(dev_input));
+	}
+
+    void studentJob4(const std::vector<uchar4> &inputImg, // Input image
 					const uint imgWidth, const uint imgHeight, // Image size
                     const std::vector<float> &matConv, // Convolution matrix (square)
 					const uint matSize, // Matrix size (width or height)
@@ -238,53 +369,66 @@ namespace IMAC
                     std::vector<uchar4> &output // Output image
 					)
 	{
-		//ChronoGPU chrGPU;
-
 		// 3 arrays for GPU
 		uchar* dev_input = NULL;
 		uchar* dev_output = NULL;
 		size_t pitch;
-		//float* dev_matConv = NULL;
-		//chrGPU.start();
+
 		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
 		dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight/threadsPerBlock.y));
 
+		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uchar4>();
+		cudaArray *cuArray;
+
+		HANDLE_ERROR(cudaMallocArray(&cuArray,&channelDesc,imgWidth,imgHeight));
+	
 		// allocate GPU buffers
-		//HANDLE_ERROR(cudaMalloc((void**)&dev_input, imgWidth * imgHeight * 4 * sizeof(uchar)));
 		HANDLE_ERROR(cudaMallocPitch((void**)&dev_input, &pitch, (imgWidth * 4) * sizeof(uchar), imgHeight));
 		HANDLE_ERROR(cudaMallocPitch((void**)&dev_output, &pitch, (imgWidth * 4) * sizeof(uchar), imgHeight));
-		//HANDLE_ERROR(cudaMalloc((void**)&dev_output, imgWidth * imgHeight * 4 * sizeof(uchar)));
-		//HANDLE_ERROR(cudaMalloc((void**)&dev_matConv, matSize * matSize * sizeof(float)));
 
 		HANDLE_ERROR(cudaMemcpyToSymbol(dev_matConv, matConv.data(), matSize*matSize*sizeof(float)));
+		HANDLE_ERROR(cudaMemcpyToArray(cuArray,0,0,inputImg.data(), imgWidth * imgHeight * 4 * sizeof(uchar),cudaMemcpyHostToDevice));
+
+
+		tex2DRef.addressMode[0] = cudaAddressModeClamp;
+		tex2DRef.addressMode[1] = cudaAddressModeClamp;
+		tex2DRef.normalized = false;
 		
 		// Copy data from host to device (input arrays) 
-		//HANDLE_ERROR(cudaMemcpy(dev_input, inputImg.data(), (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyHostToDevice));
-		//HANDLE_ERROR(cudaMemcpy(dev_matConv, matConv.data(), matSize * matSize * sizeof(float), cudaMemcpyHostToDevice));
 		HANDLE_ERROR(cudaMemcpy2D(dev_input, pitch, inputImg.data(),  imgWidth * 4 * sizeof(uchar),  imgWidth * 4 * sizeof(uchar),  imgHeight, cudaMemcpyHostToDevice));
 
-		//HANDLE_ERROR(cudaBindTexture(NULL, texRef, dev_input,  imgWidth * imgHeight * 4 * sizeof(uchar)));
-		HANDLE_ERROR(cudaBindTexture2D(NULL, tex2DRef, dev_input,  imgWidth * 4 * sizeof(uchar), imgHeight, pitch));
+		HANDLE_ERROR(cudaBindTextureToArray(tex2DRef, cuArray, channelDesc));
 
 		//launch kernel
-		//applyConvolution<<<numBlocks,threadsPerBlock>>>(dev_input,imgWidth,imgHeight,matSize,dev_matConv,dev_output);
-		//applyConvolutionv2<<<numBlocks,threadsPerBlock>>>(dev_input,imgWidth,imgHeight,matSize,dev_output);
-		//applyConvolutionv3<<<numBlocks,threadsPerBlock>>>(imgWidth,imgHeight,matSize,dev_output);
 		applyConvolutionv4<<<numBlocks,threadsPerBlock>>>(imgWidth,imgHeight,matSize,dev_output);
-
-		//chrGPU.stop();
-		//std::cout << "-> Done : " << chrGPU.elapsedTime() << " ms" << std::endl << std::endl;
 
 		HANDLE_ERROR(cudaDeviceSynchronize());
  		// Copy data from device to host (output array)
-		//HANDLE_ERROR(cudaMemcpy(output.data(), dev_output, (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyDeviceToHost));
 		HANDLE_ERROR(cudaMemcpy2D(output.data(), imgWidth * 4 * sizeof(uchar), dev_output, pitch, imgWidth * 4 * sizeof(uchar), imgHeight, cudaMemcpyDeviceToHost));
 
-		HANDLE_ERROR(cudaUnbindTexture(texRef));
-		HANDLE_ERROR(cudaUnbindTexture(tex2DRef));
 		// Free arrays on device
 		HANDLE_ERROR(cudaFree(dev_output));
-		//HANDLE_ERROR(cudaFree(dev_matConv));
+		HANDLE_ERROR(cudaFreeArray(cuArray));
 		HANDLE_ERROR(cudaFree(dev_input));
+		
+		HANDLE_ERROR(cudaUnbindTexture(tex2DRef));
+	}
+
+	void studentJob(const std::vector<uchar4> &inputImg, // Input image
+		const uint imgWidth, const uint imgHeight, // Image size
+		const std::vector<float> &matConv, // Convolution matrix (square)
+		const uint matSize, // Matrix size (width or height)
+		const std::vector<uchar4> &resultCPU, // Just for comparison
+		std::vector<uchar4> &output // Output image
+		)
+	{
+		std::cout << "Student Job 1 : " << std::endl;
+		studentJob1(inputImg,imgWidth,imgHeight,matConv,matSize,resultCPU,output);
+		std::cout << "Student Job 2 : " << std::endl;
+		studentJob2(inputImg,imgWidth,imgHeight,matConv,matSize,resultCPU,output);
+		std::cout << "Student Job 3 : " << std::endl;
+		studentJob3(inputImg,imgWidth,imgHeight,matConv,matSize,resultCPU,output);
+		std::cout << "Student Job 4 : " << std::endl;
+		studentJob4(inputImg,imgWidth,imgHeight,matConv,matSize,resultCPU,output);
 	}
 }
