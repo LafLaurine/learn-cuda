@@ -7,6 +7,10 @@
 * Author: Maxime MARIA
 */
 
+
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+
 #include "student.hpp"
 #include "chronoGPU.hpp"
 
@@ -45,9 +49,11 @@ namespace IMAC
 		cudaMemcpy(dev_input, input.data(), bytes, cudaMemcpyHostToDevice);
 
 		// Launch kernel
-		// FIXME with chuck not enough blocks. Check the rest of the division
-		int blocks = (width * height) / 512;
-		sepiaImageCUDA<<<blocks, 512>>>(width, height, dev_input, dev_output);
+		const uint BLOCK_SIZE = 32;
+		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
+        dim3 numBlocks(ceil((float)width / threadsPerBlock.x), ceil((float)height/threadsPerBlock.y));
+		sepiaImageCUDA<<<numBlocks, threadsPerBlock>>>(width, height, dev_input, dev_output);
+		HANDLE_ERROR(cudaDeviceSynchronize());
 
 		// Copy data from device to host
 		cudaMemcpy(output.data(), dev_output, bytes, cudaMemcpyDeviceToHost);
