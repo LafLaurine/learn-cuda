@@ -69,6 +69,7 @@ namespace IMAC
 		
 
 		// Ex1
+		/*
 		{
 			ChronoGPU chrGPU;
 			std::cout << std::endl << "Start Ex1" << std::endl;
@@ -88,6 +89,19 @@ namespace IMAC
 			ex2(inputImg, imgWidth, imgHeight, matConv, matSize, output);
 			chrGPU.stop();
 			std::cout 	<< "-> Ex2 Done : " << chrGPU.elapsedTime() << " ms" << std::endl;
+			std::cout << "Compare with CPU" << std::endl;
+			compareImages(output, resultCPU);
+		}
+		*/
+
+		// Ex3
+		{
+			//ChronoGPU chrGPU;
+			std::cout << std::endl << "Start Ex3" << std::endl;
+			//chrGPU.start();
+			ex3(inputImg, imgWidth, imgHeight, matConv, matSize, output);
+			//chrGPU.stop();
+			//std::cout 	<< "-> Ex3 Done : " << chrGPU.elapsedTime() << " ms" << std::endl;
 			std::cout << "Compare with CPU" << std::endl;
 			compareImages(output, resultCPU);
 		}

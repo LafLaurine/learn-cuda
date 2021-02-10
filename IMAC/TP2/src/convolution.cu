@@ -166,4 +166,54 @@ namespace IMAC
 		HANDLE_ERROR(cudaFree(d_inputImg));
 		HANDLE_ERROR(cudaFree(d_output));
     }
+
+    __global__ void cu_ex3(cudaTextureObject_t inputTex)
+    {
+        uchar4 val = tex2D<uchar4>(inputTex, 0, 0);
+        printf("Texture first pixel is %u %u %u %u \n", val.x, val.y, val.z, val.w);
+    }
+
+    void ex3(const std::vector<uchar4> &inputImg, const uint imgWidth, const uint imgHeight, const std::vector<float> &matConv,
+			const uint matSize, std::vector<uchar4> &output)
+    {
+        // Allocate CUDA array in device memory
+        cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(4, 4, 4, 4, cudaChannelFormatKindUnsigned); // uchar4
+        cudaArray* d_inputImg;
+        HANDLE_ERROR(cudaMallocArray(&d_inputImg, &channelDesc, imgWidth, imgHeight));
+
+        // Copy to device memory
+        HANDLE_ERROR(cudaMemcpyToArray(d_inputImg, 0, 0, inputImg.data(), inputImg.size() * sizeof(uchar4), cudaMemcpyHostToDevice));
+
+        // Specify texture
+        struct cudaResourceDesc resDesc;
+        memset(&resDesc, 0, sizeof(resDesc));
+        resDesc.resType = cudaResourceTypeArray;
+        resDesc.res.array.array = d_inputImg;
+
+        // Specify texture object parameters
+        struct cudaTextureDesc texDesc;
+        memset(&texDesc, 0, sizeof(texDesc));
+        texDesc.addressMode[0]   = cudaAddressModeWrap;
+        texDesc.addressMode[1]   = cudaAddressModeWrap;
+        texDesc.filterMode       = cudaFilterModeLinear;
+        texDesc.readMode         = cudaReadModeElementType;
+        texDesc.normalizedCoords = 0;
+
+        // Create texture object
+        cudaTextureObject_t d_inputImgTex = 0;
+        HANDLE_ERROR(cudaCreateTextureObject(&d_inputImgTex, &resDesc, &texDesc, NULL));
+
+        // Launch kernel
+		const uint BLOCK_SIZE = 32;
+		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
+        dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight/threadsPerBlock.y));
+		cu_ex3<<<numBlocks, threadsPerBlock>>>(d_inputImgTex);
+		HANDLE_ERROR(cudaDeviceSynchronize());
+
+        // Destroy texture object
+        HANDLE_ERROR(cudaDestroyTextureObject(d_inputImgTex));
+
+        // Free device memory
+        HANDLE_ERROR(cudaFreeArray(d_inputImg));
+    }
 }
