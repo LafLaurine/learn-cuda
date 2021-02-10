@@ -75,9 +75,9 @@ namespace IMAC
 
 		// Allocate arrays (host and device) for partial result
 		/// TODO
-		std::vector<uint> host_partialMax(0); // REPLACE SIZE !
-		const size_t bytesPartialMax = 0; // REPLACE BYTES !
-		const size_t bytesSharedMem = 0; // REPLACE BYTES !
+		std::vector<uint> host_partialMax(size/dimBlockGrid.y); // REPLACE SIZE !
+		const size_t bytesPartialMax = host_partialMax.size() * sizeof(uint); // REPLACE BYTES !
+		const size_t bytesSharedMem = dimBlockGrid.x * sizeof(uint); // REPLACE BYTES !
 		
 		uint *dev_partialMax;
 		HANDLE_ERROR(cudaMalloc((void**) &dev_partialMax, bytesPartialMax ) );
@@ -95,9 +95,8 @@ namespace IMAC
 			switch(kernelType) // Evaluated at compilation time
 			{
 				case KERNEL_EX1:
-					/// TODO EX 2
-					/// maxReduce_ex1<<<>>>();
-					std::cout << "Not implemented !" << std::endl;
+					std::cout << "Kernel 01 !" << std::endl;
+					maxReduce_ex1<<<dimBlockGrid.x,dimBlockGrid.y,bytesSharedMem>>>(dev_array, size, dev_partialMax);
 				break;
 				case KERNEL_EX2:
 					/// TODO EX 2

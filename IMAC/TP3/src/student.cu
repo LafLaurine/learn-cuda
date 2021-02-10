@@ -15,7 +15,36 @@ namespace IMAC
     __global__
     void maxReduce_ex1(const uint *const dev_array, const uint size, uint *const dev_partialMax)
 	{
-		/// TODO
+		extern __shared__ uint sharedMemory[];
+
+		unsigned int localIdx = threadIdx.x;
+		unsigned int globalIdx = localIdx + blockIdx.x * blockDim.x;
+
+		
+		sharedMemory[localIdx] = dev_array[globalIdx];
+		__syncthreads();
+
+		
+		if(globalIdx < size) {
+			if(localIdx % 2) {
+				sharedMemory[localIdx] = max(sharedMemory[localIdx],sharedMemory[localIdx+1]);
+			}
+		}
+		
+		/*
+		if(globalIdx < size) {
+			for(int i = 0 ; i < 2; ++i){
+				if(localIdx % pow(2, i+1)) {
+					sharedMemory[localIdx] = max(sharedMemory[localIdx],sharedMemory[localIdx+pow(2, i)]);
+				}
+			}
+			__syncthreads();
+		}
+		*/
+
+		__syncthreads();
+
+		dev_partialMax[blockIdx.x] = sharedMemory[0];
 	}
 
 	void studentJob(const std::vector<uint> &array, const uint resCPU /* Just for comparison */, const uint nbIterations)
@@ -24,9 +53,9 @@ namespace IMAC
         const size_t bytes = array.size() * sizeof(uint);
 
 		// Allocate array on GPU
-		HANDLE_ERROR( cudaMalloc( (void**)&dev_array, bytes ) );
+		HANDLE_ERROR(cudaMalloc((void**)&dev_array, bytes));
 		// Copy data from host to device
-		HANDLE_ERROR( cudaMemcpy( dev_array, array.data(), bytes, cudaMemcpyHostToDevice ) );
+		HANDLE_ERROR(cudaMemcpy( dev_array, array.data(), bytes, cudaMemcpyHostToDevice ) );
 
 		std::cout << "Test with " << nbIterations << " iterations" << std::endl;
 
