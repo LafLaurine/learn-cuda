@@ -66,24 +66,30 @@ namespace IMAC
                     std::vector<uchar4> &output // Output image
 					)
 	{
-		ChronoGPU chrGPU;
+		
 
 		// Ex1
-		std::cout << std::endl << "Start Ex1" << std::endl;
-		chrGPU.start();
-		ex1(inputImg, imgWidth, imgHeight, matConv, matSize, output);
-		chrGPU.stop();
-		std::cout 	<< "-> Ex1 Done : " << chrGPU.elapsedTime() << " ms" << std::endl;
-		std::cout << "Compare with CPU" << std::endl;
-		compareImages(output, resultCPU);
+		{
+			ChronoGPU chrGPU;
+			std::cout << std::endl << "Start Ex1" << std::endl;
+			chrGPU.start();
+			ex1(inputImg, imgWidth, imgHeight, matConv, matSize, output);
+			chrGPU.stop();
+			std::cout 	<< "-> Ex1 Done : " << chrGPU.elapsedTime() << " ms" << std::endl;
+			std::cout << "Compare with CPU" << std::endl;
+			compareImages(output, resultCPU);
+		}
 
 		// Ex2
-		std::cout << std::endl << "Start Ex2" << std::endl;
-		chrGPU.start();
-		ex2(inputImg, imgWidth, imgHeight, matConv, matSize, output);
-		chrGPU.stop();
-		std::cout 	<< "-> Ex2 Done : " << chrGPU.elapsedTime() << " ms" << std::endl;
-		std::cout << "Compare with CPU" << std::endl;
-		compareImages(output, resultCPU);
+		{
+			ChronoGPU chrGPU;
+			std::cout << std::endl << "Start Ex2" << std::endl;
+			chrGPU.start();
+			ex2(inputImg, imgWidth, imgHeight, matConv, matSize, output);
+			chrGPU.stop();
+			std::cout 	<< "-> Ex2 Done : " << chrGPU.elapsedTime() << " ms" << std::endl;
+			std::cout << "Compare with CPU" << std::endl;
+			compareImages(output, resultCPU);
+		}
 	}
 }
