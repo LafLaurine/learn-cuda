@@ -136,7 +136,7 @@ namespace IMAC
     void ex2(const std::vector<uchar4> &inputImg, const uint imgWidth, const uint imgHeight, const std::vector<float> &matConv,
 			const uint matSize, std::vector<uchar4> &output)
     {
-        assert(matConv.size() == 225 && "matSize must match constant memory definition");
+        assert(matConv.size() <= 225 && "matSize is too large for constant memory definition");
 
         // 2 arrays for GPU
 		uchar4* d_inputImg = nullptr;
