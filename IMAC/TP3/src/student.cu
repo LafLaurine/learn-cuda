@@ -20,30 +20,19 @@ namespace IMAC
 		unsigned int localIdx = threadIdx.x;
 		unsigned int globalIdx = localIdx + blockIdx.x * blockDim.x;
 
-		
-		sharedMemory[localIdx] = dev_array[globalIdx];
-		__syncthreads();
-
-		
-		if(globalIdx < size) {
-			if(localIdx % 2) {
-				sharedMemory[localIdx] = max(sharedMemory[localIdx],sharedMemory[localIdx+1]);
-			}
+		while (globalIdx < size) {
+			sharedMemory[localIdx] = max(sharedMemory[localIdx],dev_array[globalIdx]);
+			globalIdx += gridDim.x*blockDim.x;
 		}
-		
-		/*
-		if(globalIdx < size) {
-			for(int i = 0 ; i < 2; ++i){
-				if(localIdx % pow(2, i+1)) {
-					sharedMemory[localIdx] = max(sharedMemory[localIdx],sharedMemory[localIdx+pow(2, i)]);
-				}
-			}
+		__syncthreads();
+			
+		globalIdx = (blockDim.x * blockIdx.x) + localIdx;
+		for (unsigned int s=blockDim.x/2; s>0; s>>=1) 
+		{
+			if (localIdx < s && globalIdx < size)
+				sharedMemory[localIdx] = max(sharedMemory[localIdx], sharedMemory[localIdx + s]);
 			__syncthreads();
 		}
-		*/
-
-		__syncthreads();
-
 		dev_partialMax[blockIdx.x] = sharedMemory[0];
 	}
 

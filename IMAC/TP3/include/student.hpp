@@ -74,20 +74,20 @@ namespace IMAC
         const uint2 dimBlockGrid = configureKernel<kernelType>(size); // x: dimBlock / y: dimGrid
 
 		// Allocate arrays (host and device) for partial result
-		/// TODO
 		std::vector<uint> host_partialMax(size/dimBlockGrid.y); // REPLACE SIZE !
 		const size_t bytesPartialMax = host_partialMax.size() * sizeof(uint); // REPLACE BYTES !
 		const size_t bytesSharedMem = dimBlockGrid.x * sizeof(uint); // REPLACE BYTES !
 		
 		uint *dev_partialMax;
-		HANDLE_ERROR(cudaMalloc((void**) &dev_partialMax, bytesPartialMax ) );
+		HANDLE_ERROR(cudaMalloc((void**) &dev_partialMax, bytesPartialMax));
 
 		std::cout 	<< "Computing on " << dimBlockGrid.y << " block(s) and " 
 					<< dimBlockGrid.x << " thread(s) "
 					<<"- shared mem size = " << bytesSharedMem << std::endl;
-
+		
 		ChronoGPU chrGPU;
 		float2 timing = { 0.f, 0.f }; // x: timing GPU, y: timing CPU
+
 		// Average timing on 'loop' iterations
 		for (uint i = 0; i < nbIterations; ++i)
 		{
@@ -96,7 +96,7 @@ namespace IMAC
 			{
 				case KERNEL_EX1:
 					std::cout << "Kernel 01 !" << std::endl;
-					maxReduce_ex1<<<dimBlockGrid.x,dimBlockGrid.y,bytesSharedMem>>>(dev_array, size, dev_partialMax);
+					maxReduce_ex1<<<dimBlockGrid.y,dimBlockGrid.x,bytesSharedMem>>>(dev_array, size,dev_partialMax);
 				break;
 				case KERNEL_EX2:
 					/// TODO EX 2
