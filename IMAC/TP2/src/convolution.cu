@@ -136,7 +136,7 @@ namespace IMAC
     void ex2(const std::vector<uchar4> &inputImg, const uint imgWidth, const uint imgHeight, const std::vector<float> &matConv,
 			const uint matSize, std::vector<uchar4> &output)
     {
-        assert(matConv.size() == 225 && "matSize must equal 9 to match constant memory definition");
+        assert(matConv.size() == 225 && "matSize must match constant memory definition");
 
         // 2 arrays for GPU
 		uchar4* d_inputImg = nullptr;
@@ -150,7 +150,7 @@ namespace IMAC
 		HANDLE_ERROR(cudaMemcpy(d_inputImg, inputImg.data(), sizeof(uchar4) * inputImg.size(), cudaMemcpyHostToDevice));
 
         // Copy kernel to constant memory
-        HANDLE_ERROR(cudaMemcpyToSymbol(MAT_CONV, &matConv, matConv.size() * sizeof(float)));
+        HANDLE_ERROR(cudaMemcpyToSymbol(MAT_CONV, matConv.data(), matConv.size() * sizeof(float)));
 
 		// Launch kernel
 		const uint BLOCK_SIZE = 32;
