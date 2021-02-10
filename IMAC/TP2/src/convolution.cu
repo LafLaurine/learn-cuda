@@ -169,8 +169,9 @@ namespace IMAC
 
     texture<uchar4, cudaTextureType1D, cudaReadModeElementType> inputTex;
 
-    __global__ void cu_ex3()
+    __global__ void cu_ex3(const uint imgWidth, const uint imgHeight, const uint matSize, float* matConv, uchar4* output)
     {
+        // tex1D is used for cudaArray. tex1Dfetch is for linear memory
         uchar4 val = tex1Dfetch<uchar4>(inputTex, 0);
         printf("Texture first pixel is %u %u %u %u \n", val.x, val.y, val.z, val.w);
     }
@@ -179,18 +180,37 @@ namespace IMAC
     void ex3(const std::vector<uchar4> &inputImg, const uint imgWidth, const uint imgHeight, const std::vector<float> &matConv,
 			const uint matSize, std::vector<uchar4> &output)
     {
-        uchar4* d_inputImg = nullptr;
-        HANDLE_ERROR(cudaMalloc(&d_inputImg, sizeof(uchar4)));
+        // 3 arrays for GPU
+		uchar4* d_inputImg = nullptr;
+		float* d_matConv = nullptr;
+		uchar4* d_output = nullptr;
 
-        uchar4 test[1] = { 1, 1, 1, 1 };
-        HANDLE_ERROR(cudaMemcpy(d_inputImg, test, sizeof(uchar4), cudaMemcpyHostToDevice));
+		// Allocate arrays
+		HANDLE_ERROR(cudaMalloc(&d_inputImg, sizeof(uchar4) * inputImg.size()));
+		HANDLE_ERROR(cudaMalloc(&d_matConv, sizeof(float) * matConv.size()));
+		HANDLE_ERROR(cudaMalloc(&d_output, sizeof(uchar4) * inputImg.size()));
 
+		// Copy data from host to device
+		HANDLE_ERROR(cudaMemcpy(d_inputImg, inputImg.data(), sizeof(uchar4) * inputImg.size(), cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaMemcpy(d_matConv, matConv.data(), sizeof(float) * matConv.size(), cudaMemcpyHostToDevice));
+
+        // Bind input image to texture memory
         cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uchar>();
-        HANDLE_ERROR(cudaBindTexture(0, inputTex, d_inputImg, sizeof(uchar4)));
+        HANDLE_ERROR(cudaBindTexture(0, inputTex, d_inputImg, sizeof(uchar4) * inputImg.size()));
 
-        cu_ex3<<<1, 1>>>();
+        // Launch kernel
+		const uint BLOCK_SIZE = 32;
+		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
+        dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight/threadsPerBlock.y));
+		cu_ex3<<<numBlocks, threadsPerBlock>>>(imgWidth, imgHeight, matSize, d_matConv, d_output);
 		HANDLE_ERROR(cudaDeviceSynchronize());
 
-        HANDLE_ERROR(cudaFree(d_inputImg));
+        // Copy data from device to host (output array)
+		HANDLE_ERROR(cudaMemcpy(output.data(), d_output, sizeof(uchar4) * inputImg.size(), cudaMemcpyDeviceToHost));
+
+		// Free arrays on device
+		HANDLE_ERROR(cudaFree(d_inputImg));
+		HANDLE_ERROR(cudaFree(d_matConv));
+		HANDLE_ERROR(cudaFree(d_output));
     }
 }
