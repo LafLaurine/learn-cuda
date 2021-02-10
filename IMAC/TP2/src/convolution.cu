@@ -171,7 +171,7 @@ namespace IMAC
 
     __global__ void cu_ex3()
     {
-        uchar4 val = tex1D<uchar4>(inputTex, 0);
+        uchar4 val = tex1Dfetch<uchar4>(inputTex, 0);
         printf("Texture first pixel is %u %u %u %u \n", val.x, val.y, val.z, val.w);
     }
 
@@ -180,7 +180,7 @@ namespace IMAC
 			const uint matSize, std::vector<uchar4> &output)
     {
         uchar4* d_inputImg = nullptr;
-        HANDLE_ERROR(cudaMalloc(&d_inputImg, sizeof(uchar4) * inputImg.size()));
+        HANDLE_ERROR(cudaMalloc(&d_inputImg, sizeof(uchar4)));
 
         uchar4 test[1] = { 1, 1, 1, 1 };
         HANDLE_ERROR(cudaMemcpy(d_inputImg, test, sizeof(uchar4), cudaMemcpyHostToDevice));
