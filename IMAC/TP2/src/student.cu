@@ -144,8 +144,8 @@ namespace IMAC
 		}
 	}
 
-	texture<uchar,1,cudaReadModeElementType> texRef;
-	texture<uchar,2,cudaReadModeElementType> tex2DRef;
+	texture<uchar> texRef;
+	texture<uchar4,2> tex2DRef;
 
 	__global__ void applyConvolutionv3(const uint imgWidth, const uint imgHeight,  const uint matSize, unsigned char* dev_output)
 	{
@@ -184,7 +184,7 @@ namespace IMAC
 			dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
 			dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
 			dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
-			dev_output[index+3] = 255;
+			dev_output[index+3] = 255.f;
 		}
 	}
 
@@ -194,7 +194,7 @@ namespace IMAC
 		unsigned int idy = blockIdx.y * blockDim.y + threadIdx.y;
 		int index = (idy * imgWidth + idx) * 4;
 		if (idx < imgWidth && idy < imgHeight){
-			float3 sum = make_float3(0.f,0.f,0.f);
+			float4 sum = make_float4(0.f,0.f,0.f,0.f);
 			for (uint j = 0; j < matSize; j++) 
 			{
 				for (uint i = 0; i < matSize; i++) 
@@ -216,25 +216,23 @@ namespace IMAC
 						dY = imgHeight - 1;
 					
 					const int idMat = j * matSize + i;
-					const uchar c = tex2D(tex2DRef,dX,dY);
-					sum.x += (float)(c) * dev_matConv[idMat];
-					sum.y += (float)(c+1) * dev_matConv[idMat];
-					sum.z += (float)(c+2) * dev_matConv[idMat];
+					const uchar4 c = tex2D(tex2DRef,dX,dY);
+					sum.x += (float)(c.x) * dev_matConv[idMat];
+					sum.y += (float)(c.y) * dev_matConv[idMat];
+					sum.z += (float)(c.z) * dev_matConv[idMat];
 				}
 			}
 			dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
 			dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
 			dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
-			dev_output[index+3] = 255;
+			dev_output[index+3] = 255.f;
 		}
 	}
 
-	
     void studentJob1(const std::vector<uchar4> &inputImg, // Input image
 		const uint imgWidth, const uint imgHeight, // Image size
 		const std::vector<float> &matConv, // Convolution matrix (square)
 		const uint matSize, // Matrix size (width or height)
-		const std::vector<uchar4> &resultCPU, // Just for comparison
 		std::vector<uchar4> &output // Output image
 		)
 	{
@@ -278,7 +276,6 @@ namespace IMAC
 		const uint imgWidth, const uint imgHeight, // Image size
 		const std::vector<float> &matConv, // Convolution matrix (square)
 		const uint matSize, // Matrix size (width or height)
-		const std::vector<uchar4> &resultCPU, // Just for comparison
 		std::vector<uchar4> &output // Output image
 		)
 	{
@@ -320,7 +317,6 @@ namespace IMAC
 		const uint imgWidth, const uint imgHeight, // Image size
 		const std::vector<float> &matConv, // Convolution matrix (square)
 		const uint matSize, // Matrix size (width or height)
-		const std::vector<uchar4> &resultCPU, // Just for comparison
 		std::vector<uchar4> &output // Output image
 		)
 	{
@@ -340,7 +336,7 @@ namespace IMAC
 
 		// Copy data from host to device (input arrays) 
 		HANDLE_ERROR(cudaMemcpyToSymbol(dev_matConv, matConv.data(), matSize*matSize*sizeof(float)));
-
+		HANDLE_ERROR(cudaMemcpy(dev_input, inputImg.data(), (imgWidth * imgHeight * 4) * sizeof(uchar), cudaMemcpyHostToDevice));
 		// bind texture
 		HANDLE_ERROR(cudaBindTexture(NULL, texRef, dev_input,  imgWidth * imgHeight * 4 * sizeof(uchar)));
 
@@ -365,7 +361,6 @@ namespace IMAC
 					const uint imgWidth, const uint imgHeight, // Image size
                     const std::vector<float> &matConv, // Convolution matrix (square)
 					const uint matSize, // Matrix size (width or height)
-					const std::vector<uchar4> &resultCPU, // Just for comparison
                     std::vector<uchar4> &output // Output image
 					)
 	{
@@ -377,41 +372,29 @@ namespace IMAC
 		dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
 		dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight/threadsPerBlock.y));
 
-		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uchar4>();
-		cudaArray *cuArray;
-
-		HANDLE_ERROR(cudaMallocArray(&cuArray,&channelDesc,imgWidth,imgHeight));
-	
 		// allocate GPU buffers
-		HANDLE_ERROR(cudaMallocPitch((void**)&dev_input, &pitch, (imgWidth * 4) * sizeof(uchar), imgHeight));
-		HANDLE_ERROR(cudaMallocPitch((void**)&dev_output, &pitch, (imgWidth * 4) * sizeof(uchar), imgHeight));
+		HANDLE_ERROR(cudaMallocPitch((void**)&dev_input, &pitch, (imgWidth) * sizeof(uchar) * 4, imgHeight));
 
+		HANDLE_ERROR(cudaMemcpy2D(dev_input,pitch,inputImg.data(),  sizeof(uchar) * 4 *imgWidth,imgWidth * sizeof(uchar) * 4, imgHeight, cudaMemcpyHostToDevice));
 		HANDLE_ERROR(cudaMemcpyToSymbol(dev_matConv, matConv.data(), matSize*matSize*sizeof(float)));
-		HANDLE_ERROR(cudaMemcpyToArray(cuArray,0,0,inputImg.data(), imgWidth * imgHeight * 4 * sizeof(uchar),cudaMemcpyHostToDevice));
-
-
-		tex2DRef.addressMode[0] = cudaAddressModeClamp;
-		tex2DRef.addressMode[1] = cudaAddressModeClamp;
-		tex2DRef.normalized = false;
 		
-		// Copy data from host to device (input arrays) 
-		HANDLE_ERROR(cudaMemcpy2D(dev_input, pitch, inputImg.data(),  imgWidth * 4 * sizeof(uchar),  imgWidth * 4 * sizeof(uchar),  imgHeight, cudaMemcpyHostToDevice));
+		HANDLE_ERROR(cudaBindTexture2D(NULL, tex2DRef, dev_input, tex2DRef.channelDesc, imgWidth, imgHeight, pitch));
 
-		HANDLE_ERROR(cudaBindTextureToArray(tex2DRef, cuArray, channelDesc));
+		//tex2DRef.normalized = false;  // don't use normalized values                   
+
+		HANDLE_ERROR(cudaMalloc(&dev_output, 4*imgWidth*imgHeight*sizeof(uchar)));
 
 		//launch kernel
 		applyConvolutionv4<<<numBlocks,threadsPerBlock>>>(imgWidth,imgHeight,matSize,dev_output);
 
 		HANDLE_ERROR(cudaDeviceSynchronize());
  		// Copy data from device to host (output array)
-		HANDLE_ERROR(cudaMemcpy2D(output.data(), imgWidth * 4 * sizeof(uchar), dev_output, pitch, imgWidth * 4 * sizeof(uchar), imgHeight, cudaMemcpyDeviceToHost));
+		HANDLE_ERROR(cudaMemcpy(output.data(), dev_output, 4 * imgHeight * imgWidth * sizeof(uchar), cudaMemcpyDeviceToHost));
 
+		HANDLE_ERROR(cudaUnbindTexture(tex2DRef));
 		// Free arrays on device
 		HANDLE_ERROR(cudaFree(dev_output));
-		HANDLE_ERROR(cudaFreeArray(cuArray));
 		HANDLE_ERROR(cudaFree(dev_input));
-		
-		HANDLE_ERROR(cudaUnbindTexture(tex2DRef));
 	}
 
 	void studentJob(const std::vector<uchar4> &inputImg, // Input image
@@ -422,13 +405,20 @@ namespace IMAC
 		std::vector<uchar4> &output // Output image
 		)
 	{
+		std::cout << "------------------" << std::endl;
+		std::cout << "GPU " << std::endl;
 		std::cout << "Student Job 1 : " << std::endl;
-		studentJob1(inputImg,imgWidth,imgHeight,matConv,matSize,resultCPU,output);
+		studentJob1(inputImg,imgWidth,imgHeight,matConv,matSize,output);
+		compareImages(resultCPU,output);
 		std::cout << "Student Job 2 : " << std::endl;
-		studentJob2(inputImg,imgWidth,imgHeight,matConv,matSize,resultCPU,output);
+		studentJob2(inputImg,imgWidth,imgHeight,matConv,matSize,output);
+		compareImages(resultCPU,output);
+
 		std::cout << "Student Job 3 : " << std::endl;
-		studentJob3(inputImg,imgWidth,imgHeight,matConv,matSize,resultCPU,output);
+		studentJob3(inputImg,imgWidth,imgHeight,matConv,matSize,output);
+		compareImages(resultCPU,output);
 		std::cout << "Student Job 4 : " << std::endl;
-		studentJob4(inputImg,imgWidth,imgHeight,matConv,matSize,resultCPU,output);
+		studentJob4(inputImg,imgWidth,imgHeight,matConv,matSize,output);
+		compareImages(resultCPU,output);
 	}
 }
