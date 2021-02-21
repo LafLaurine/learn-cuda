@@ -94,7 +94,12 @@ namespace IMAC
 	uint2 configureKernel(const uint sizeArray)
 	{
 		uint2 dimBlockGrid; // x: dimBlock / y: dimGrid
+		cudaDeviceProp prop;
+        int device;
+        HANDLE_ERROR(cudaGetDevice(&device));
+        HANDLE_ERROR(cudaGetDeviceProperties(&prop, device));
 
+        unsigned long maxThreadsPerBlock	= prop.maxThreadsPerBlock;
 		const int totalNumberThreads = sizeArray / 2 + 1;
 
 		// Configure number of threads/blocks
@@ -105,11 +110,11 @@ namespace IMAC
 				dimBlockGrid.y = DEFAULT_NB_BLOCKS;
 			break;
 			case KERNEL_EX2:
-				dimBlockGrid.y = (totalNumberThreads - 1) / DEFAULT_NB_BLOCKS + 1;
+				dimBlockGrid.y = (totalNumberThreads - 1) / maxThreadsPerBlock + 1;
 				dimBlockGrid.x = (totalNumberThreads - 1) / dimBlockGrid.y + 1;
 			break;
 			case KERNEL_EX3:
-				dimBlockGrid.y = (totalNumberThreads - 1) / DEFAULT_NB_BLOCKS + 1;
+				dimBlockGrid.y = (totalNumberThreads - 1) / maxThreadsPerBlock + 1;
 				dimBlockGrid.x = (totalNumberThreads - 1) / dimBlockGrid.y + 1;
 			break;
 			case KERNEL_EX4:
