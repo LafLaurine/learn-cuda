@@ -63,41 +63,45 @@ namespace IMAC
 		int idx = blockIdx.x * blockDim.x + threadIdx.x;
 		int idy = blockIdx.y * blockDim.y + threadIdx.y;
 		int index = (idy * imgWidth + idx) * 4;
-		if (idx < imgWidth && idy < imgHeight){
-			float3 sum = make_float3(0.f,0.f,0.f);
-			
-			// Apply convolution
-			for (uint j = 0; j < matSize; j++) 
-			{
-				for (uint i = 0; i < matSize; i++) 
+		for (int w = idx; w < imgWidth; w += blockDim.x * gridDim.x)
+        {
+            for (int h = idy; h < imgHeight; h += blockDim.y * gridDim.y)
+            {
+				float3 sum = make_float3(0.f,0.f,0.f);
+				
+				// Apply convolution
+				for (uint j = 0; j < matSize; j++) 
 				{
-					int dX = idx + i - matSize / 2;
-					int dY = idy + j - matSize / 2;
+					for (uint i = 0; i < matSize; i++) 
+					{
+						int dX = idx + i - matSize / 2;
+						int dY = idy + j - matSize / 2;
 
-					// Handle borders
-					if (dX < 0) 
-						dX = 0;
+						// Handle borders
+						if (dX < 0) 
+							dX = 0;
 
-					if (dX >= imgWidth) 
-						dX = imgWidth - 1;
+						if (dX >= imgWidth) 
+							dX = imgWidth - 1;
 
-					if (dY < 0) 
-						dY = 0;
+						if (dY < 0) 
+							dY = 0;
 
-					if (dY >= imgHeight) 
-						dY = imgHeight - 1;
-					
-					const int idMat = j * matSize + i;
-					const int idPixel = (dY * imgWidth + dX) * 4;
-					sum.x += (float)dev_input[idPixel] * dev_matConv[idMat];
-					sum.y += (float)dev_input[idPixel+1] * dev_matConv[idMat];
-					sum.z += (float)dev_input[idPixel+2] * dev_matConv[idMat];
+						if (dY >= imgHeight) 
+							dY = imgHeight - 1;
+						
+						const int idMat = j * matSize + i;
+						const int idPixel = (dY * imgWidth + dX) * 4;
+						sum.x += (float)dev_input[idPixel] * dev_matConv[idMat];
+						sum.y += (float)dev_input[idPixel+1] * dev_matConv[idMat];
+						sum.z += (float)dev_input[idPixel+2] * dev_matConv[idMat];
+					}
 				}
+				dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
+				dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
+				dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
+				dev_output[index+3] = 255;
 			}
-			dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
-			dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
-			dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
-			dev_output[index+3] = 255;
 		}
 	}
 
@@ -108,39 +112,43 @@ namespace IMAC
 		int idx = blockIdx.x * blockDim.x + threadIdx.x;
 		int idy = blockIdx.y * blockDim.y + threadIdx.y;
 		int index = (idy * imgWidth + idx) * 4;
-		if (idx < imgWidth && idy < imgHeight){
-			float3 sum = make_float3(0.f,0.f,0.f);
-			for (uint j = 0; j < matSize; j++) 
-			{
-				for (uint i = 0; i < matSize; i++) 
+		for (int w = idx; w < imgWidth; w += blockDim.x * gridDim.x)
+        {
+            for (int h = idy; h < imgHeight; h += blockDim.y * gridDim.y)
+            {
+				float3 sum = make_float3(0.f,0.f,0.f);
+				for (uint j = 0; j < matSize; j++) 
 				{
-					int dX = idx + i - matSize / 2;
-					int dY = idy + j - matSize / 2;
+					for (uint i = 0; i < matSize; i++) 
+					{
+						int dX = idx + i - matSize / 2;
+						int dY = idy + j - matSize / 2;
 
-					// Handle borders
-					if (dX < 0) 
-						dX = 0;
+						// Handle borders
+						if (dX < 0) 
+							dX = 0;
 
-					if (dX >= imgWidth) 
-						dX = imgWidth - 1;
+						if (dX >= imgWidth) 
+							dX = imgWidth - 1;
 
-					if (dY < 0) 
-						dY = 0;
+						if (dY < 0) 
+							dY = 0;
 
-					if (dY >= imgHeight) 
-						dY = imgHeight - 1;
-					
-					const int idMat = j * matSize + i;
-					const int idPixel = (dY * imgWidth + dX) * 4;
-					sum.x += (float)dev_input[idPixel] * dev_matConv[idMat];
-					sum.y += (float)dev_input[idPixel+1] * dev_matConv[idMat];
-					sum.z += (float)dev_input[idPixel+2] * dev_matConv[idMat];
+						if (dY >= imgHeight) 
+							dY = imgHeight - 1;
+						
+						const int idMat = j * matSize + i;
+						const int idPixel = (dY * imgWidth + dX) * 4;
+						sum.x += (float)dev_input[idPixel] * dev_matConv[idMat];
+						sum.y += (float)dev_input[idPixel+1] * dev_matConv[idMat];
+						sum.z += (float)dev_input[idPixel+2] * dev_matConv[idMat];
+					}
 				}
+				dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
+				dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
+				dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
+				dev_output[index+3] = 255;
 			}
-			dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
-			dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
-			dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
-			dev_output[index+3] = 255;
 		}
 	}
 
@@ -152,39 +160,43 @@ namespace IMAC
 		unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 		unsigned int idy = blockIdx.y * blockDim.y + threadIdx.y;
 		int index = (idy * imgWidth + idx) * 4;
-		if (idx < imgWidth && idy < imgHeight){
-			float3 sum = make_float3(0.f,0.f,0.f);
-			for (uint j = 0; j < matSize; j++) 
-			{
-				for (uint i = 0; i < matSize; i++) 
+		for (int w = idx; w < imgWidth; w += blockDim.x * gridDim.x)
+        {
+            for (int h = idy; h < imgHeight; h += blockDim.y * gridDim.y)
+            {
+				float3 sum = make_float3(0.f,0.f,0.f);
+				for (uint j = 0; j < matSize; j++) 
 				{
-					int dX = idx + i - matSize / 2;
-					int dY = idy + j - matSize / 2;
+					for (uint i = 0; i < matSize; i++) 
+					{
+						int dX = idx + i - matSize / 2;
+						int dY = idy + j - matSize / 2;
 
-					// Handle borders
-					if (dX < 0) 
-						dX = 0;
+						// Handle borders
+						if (dX < 0) 
+							dX = 0;
 
-					if (dX >= imgWidth) 
-						dX = imgWidth - 1;
+						if (dX >= imgWidth) 
+							dX = imgWidth - 1;
 
-					if (dY < 0) 
-						dY = 0;
+						if (dY < 0) 
+							dY = 0;
 
-					if (dY >= imgHeight) 
-						dY = imgHeight - 1;
-					
-					const int idMat = j * matSize + i;
-					const int idPixel = (dY * imgWidth + dX) * 4;
-					sum.x += (float)tex1Dfetch(texRef,idPixel) * dev_matConv[idMat];
-					sum.y += (float)tex1Dfetch(texRef,idPixel+1) * dev_matConv[idMat];
-					sum.z += (float)tex1Dfetch(texRef,idPixel+2) * dev_matConv[idMat];
+						if (dY >= imgHeight) 
+							dY = imgHeight - 1;
+						
+						const int idMat = j * matSize + i;
+						const int idPixel = (dY * imgWidth + dX) * 4;
+						sum.x += (float)tex1Dfetch(texRef,idPixel) * dev_matConv[idMat];
+						sum.y += (float)tex1Dfetch(texRef,idPixel+1) * dev_matConv[idMat];
+						sum.z += (float)tex1Dfetch(texRef,idPixel+2) * dev_matConv[idMat];
+					}
 				}
+				dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
+				dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
+				dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
+				dev_output[index+3] = 255.f;
 			}
-			dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
-			dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
-			dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
-			dev_output[index+3] = 255.f;
 		}
 	}
 
@@ -193,39 +205,43 @@ namespace IMAC
 		unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 		unsigned int idy = blockIdx.y * blockDim.y + threadIdx.y;
 		int index = (idy * imgWidth + idx) * 4;
-		if (idx < imgWidth && idy < imgHeight){
-			float4 sum = make_float4(0.f,0.f,0.f,0.f);
-			for (uint j = 0; j < matSize; j++) 
-			{
-				for (uint i = 0; i < matSize; i++) 
+		for (int w = idx; w < imgWidth; w += blockDim.x * gridDim.x)
+        {
+            for (int h = idy; h < imgHeight; h += blockDim.y * gridDim.y)
+            {
+				float4 sum = make_float4(0.f,0.f,0.f,0.f);
+				for (uint j = 0; j < matSize; j++) 
 				{
-					int dX = idx + i - matSize / 2;
-					int dY = idy + j - matSize / 2;
+					for (uint i = 0; i < matSize; i++) 
+					{
+						int dX = idx + i - matSize / 2;
+						int dY = idy + j - matSize / 2;
 
-					// Handle borders
-					if (dX < 0) 
-						dX = 0;
+						// Handle borders
+						if (dX < 0) 
+							dX = 0;
 
-					if (dX >= imgWidth) 
-						dX = imgWidth - 1;
+						if (dX >= imgWidth) 
+							dX = imgWidth - 1;
 
-					if (dY < 0) 
-						dY = 0;
+						if (dY < 0) 
+							dY = 0;
 
-					if (dY >= imgHeight) 
-						dY = imgHeight - 1;
-					
-					const int idMat = j * matSize + i;
-					const uchar4 c = tex2D(tex2DRef,dX,dY);
-					sum.x += (float)(c.x) * dev_matConv[idMat];
-					sum.y += (float)(c.y) * dev_matConv[idMat];
-					sum.z += (float)(c.z) * dev_matConv[idMat];
+						if (dY >= imgHeight) 
+							dY = imgHeight - 1;
+						
+						const int idMat = j * matSize + i;
+						const uchar4 c = tex2D(tex2DRef,dX,dY);
+						sum.x += (float)(c.x) * dev_matConv[idMat];
+						sum.y += (float)(c.y) * dev_matConv[idMat];
+						sum.z += (float)(c.z) * dev_matConv[idMat];
+					}
 				}
+				dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
+				dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
+				dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
+				dev_output[index+3] = 255.f;
 			}
-			dev_output[index] = (uchar)max(0.f,min(255.f,sum.x));
-			dev_output[index+1] = (uchar)max(0.f,min(255.f,sum.y));
-			dev_output[index+2] = (uchar)max(0.f,min(255.f,sum.z));
-			dev_output[index+3] = 255.f;
 		}
 	}
 

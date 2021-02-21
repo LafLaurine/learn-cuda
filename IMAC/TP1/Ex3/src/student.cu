@@ -24,11 +24,15 @@ namespace IMAC
 		int idx = blockIdx.x * blockDim.x + threadIdx.x;
 		int idy = blockIdx.y * blockDim.y + threadIdx.y;
 		int index = (idy * width + idx) * 3;
-		if (idx < width && idy < height){
+		for (int w = idx; w < width; w += blockDim.x * gridDim.x)
+        {
+            for (int h = idy; h < height; h += blockDim.y * gridDim.y)
+            {
 			//replace pixel
 			dev_output[index] = min(255.0f, (dev_input[index] * 0.393f + dev_input[index+1] * 0.769f + dev_input[index+2] * 0.189f));
 			dev_output[index+1] = min(255.0f, (dev_input[index] * 0.349f + dev_input[index+1] * 0.686f + dev_input[index+2] * 0.168f));
 			dev_output[index+2] = min(255.0f, (dev_input[index] * 0.272f + dev_input[index+1] * 0.534f + dev_input[index+2] * 0.131f));
+			}
 		}
 	} 
 
