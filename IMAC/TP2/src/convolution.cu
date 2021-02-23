@@ -313,6 +313,7 @@ namespace IMAC
         
         // Copy from host to device
         HANDLE_ERROR(cudaMemcpy2D(d_inputImg, pitch, inputImg.data(), sizeof(uchar4) * imgWidth, imgWidth * sizeof(uchar4), imgHeight, cudaMemcpyHostToDevice));
+        HANDLE_ERROR(cudaMemcpy(d_matConv, matConv.data(), sizeof(float) * matConv.size(), cudaMemcpyHostToDevice));
 
         HANDLE_ERROR(cudaBindTexture2D(NULL, inputTex2D, d_inputImg, inputTex2D.channelDesc, imgWidth, imgHeight, pitch));
 
