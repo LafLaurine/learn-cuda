@@ -250,4 +250,86 @@ namespace IMAC
         HANDLE_ERROR(cudaFree(d_matConv));
         HANDLE_ERROR(cudaFree(d_output));
     }
+
+    texture<uchar4, 2> inputTex2D;
+
+    __global__ void cu_ex4(const uint imgWidth, const uint imgHeight, float *matConv, const uint matSize, uchar4 *output)
+    {
+        for (int h = threadIdx.y + blockDim.y * blockIdx.y; h < imgHeight; h += blockDim.y * gridDim.y)
+        {
+            for (int w = threadIdx.x + blockDim.x * blockIdx.x; w < imgWidth; w += blockDim.x * gridDim.x)
+            {
+                float3 sum = make_float3(0.f, 0.f, 0.f);
+                // Apply convolution
+                for (uint j = 0; j < matSize; ++j)
+                {
+                    for (uint i = 0; i < matSize; ++i)
+                    {
+                        int dX = w + i - matSize / 2;
+                        int dY = h + j - matSize / 2;
+
+                        // Handle borders
+                        if (dX < 0)
+                            dX = 0;
+
+                        if (dX >= imgWidth)
+                            dX = imgWidth - 1;
+
+                        if (dY < 0)
+                            dY = 0;
+
+                        if (dY >= imgHeight)
+                            dY = imgHeight - 1;
+
+                        const int idMat = j * matSize + i;
+                        uchar4 val = tex2D(inputTex2D, dX, dY);
+                        sum.x += (float)val.x * matConv[idMat];
+                        sum.y += (float)val.y * matConv[idMat];
+                        sum.z += (float)val.z * matConv[idMat];
+                    }
+                }
+                const int index = w + imgWidth * h;
+                output[index].x = __float2uint_rd(cu_clampf(sum.x, 0.f, 255.f));
+                output[index].y = __float2uint_rd(cu_clampf(sum.y, 0.f, 255.f));
+                output[index].z = __float2uint_rd(cu_clampf(sum.z, 0.f, 255.f));
+                output[index].w = 255;
+            }
+        }
+    }
+
+    void ex4(const std::vector<uchar4> &inputImg, const uint imgWidth, const uint imgHeight, const std::vector<float> &matConv,
+             const uint matSize, std::vector<uchar4> &output)
+    {
+        // 3 arrays for GPU
+        uchar4 *d_inputImg = nullptr;
+        float *d_matConv = nullptr;
+        uchar4 *d_output = nullptr;
+        size_t pitch;
+
+        // Allocate arrays
+        HANDLE_ERROR(cudaMallocPitch(&d_inputImg, &pitch, imgWidth * sizeof(uchar4), imgHeight));
+        HANDLE_ERROR(cudaMalloc(&d_matConv, sizeof(float) * matConv.size()));
+        HANDLE_ERROR(cudaMalloc(&d_output, sizeof(uchar4) * inputImg.size()));
+        
+        // Copy from host to device
+        HANDLE_ERROR(cudaMemcpy2D(d_inputImg, pitch, inputImg.data(), sizeof(uchar4) * imgWidth, imgWidth * sizeof(uchar4), imgHeight, cudaMemcpyHostToDevice));
+
+        HANDLE_ERROR(cudaBindTexture2D(NULL, inputTex2D, d_inputImg, inputTex2D.channelDesc, imgWidth, imgHeight, pitch));
+
+        // launch kernel
+        const uint BLOCK_SIZE = 32;
+        dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
+        dim3 numBlocks(ceil((float)imgWidth / threadsPerBlock.x), ceil((float)imgHeight / threadsPerBlock.y));
+        cu_ex4<<<numBlocks, threadsPerBlock>>>(imgWidth, imgHeight, d_matConv, matSize, d_output);
+        HANDLE_ERROR(cudaDeviceSynchronize());
+
+        // Copy data from device to host (output array)
+        HANDLE_ERROR(cudaMemcpy(output.data(), d_output, sizeof(uchar4) * inputImg.size(), cudaMemcpyDeviceToHost));
+
+        // Free arrays on device
+        HANDLE_ERROR(cudaUnbindTexture(inputTex2D));
+        HANDLE_ERROR(cudaFree(d_output));
+        HANDLE_ERROR(cudaFree(d_inputImg));
+        HANDLE_ERROR(cudaFree(d_matConv));
+    }
 }
