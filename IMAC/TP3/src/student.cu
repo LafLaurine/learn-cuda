@@ -19,10 +19,10 @@ namespace IMAC
     }
 
 	__device__
-    void cuda_fillsharedArray(uint* sharedMemory, const uint* const dev_array, const uint size)
+	void cuda_fillsharedArray(uint* sharedMemory, const uint* const dev_array, const uint size)
     {
         int localIdx = 2 * threadIdx.x;
-        int globalIdx = localIdx + 2 * blockIdx.x * blockDim.x;
+        int globalIdx = localIdx + 2 + blockIdx.x * blockDim.x;
         if (globalIdx < size)
         {
             sharedMemory[localIdx] = dev_array[globalIdx];
@@ -39,18 +39,26 @@ namespace IMAC
     void maxReduce_ex1(const uint *const dev_array, const uint size, uint *const dev_partialMax)
 	{
 		extern __shared__ uint sharedMemory[];
-		int localIdx = 2 * threadIdx.x;
-		int numberToProcess = cuda_getNumberToProcess(size);
-		cuda_fillsharedArray(sharedMemory, dev_array, size);
+		int localIdx = threadIdx.x;
+		int globalIdx = localIdx + blockIdx.x * blockDim.x;
+
+		if (globalIdx < size)
+        {
+            sharedMemory[localIdx] = dev_array[globalIdx];
+        } else {
+			sharedMemory[localIdx] = 0;
+		}
+
+		__syncthreads();
+
 		for(unsigned int s = 1; s < blockDim.x; s *= 2)
 		{
 			const unsigned int sIndex = 2 * s * localIdx;
 			int sNext = sIndex + s;
-			if (sIndex >= numberToProcess || sNext >= numberToProcess)
-            {
-                break;
+			if (sNext < blockDim.x)
+			{
+				sharedMemory[sIndex] = umax(sharedMemory[sIndex], sharedMemory[sNext]);
             }
-			sharedMemory[sIndex] = umax(sharedMemory[sIndex], sharedMemory[sNext]);
 			__syncthreads();
 		}
 
@@ -58,7 +66,6 @@ namespace IMAC
 		{
 			dev_partialMax[blockIdx.x] = sharedMemory[0];
 		}
-		__syncthreads();
 	}
 
 	// ==================================================== EX 2, EX3
@@ -99,7 +106,7 @@ namespace IMAC
         HANDLE_ERROR(cudaGetDevice(&device));
         HANDLE_ERROR(cudaGetDeviceProperties(&prop, device));
 
-        unsigned long maxThreadsPerBlock	= prop.maxThreadsPerBlock;
+        unsigned long maxThreadsPerBlock = prop.maxThreadsPerBlock;
 		const int totalNumberThreads = sizeArray / 2 + 1;
 
 		// Configure number of threads/blocks
@@ -140,7 +147,7 @@ namespace IMAC
 		// Allocate arrays (host and device) for partial result
 		std::vector<uint> host_partialMax(dimBlockGrid.y);
 		const size_t bytesPartialMax = host_partialMax.size() * sizeof(uint);
-		const size_t bytesSharedMem = 2 * dimBlockGrid.x * sizeof(uint);
+		const size_t bytesSharedMem = dimBlockGrid.x * sizeof(uint);
 		
 		uint *dev_partialMax;
 		HANDLE_ERROR(cudaMalloc((void**) &dev_partialMax, bytesPartialMax));
@@ -164,11 +171,11 @@ namespace IMAC
 				break;
 				case KERNEL_EX2:
 					std::cout << "Kernel 02 !" << std::endl;
-					maxReduce_ex23<<<dimBlockGrid.y, dimBlockGrid.x, bytesSharedMem>>>(dev_array, size, dev_partialMax);
+					maxReduce_ex23<<<dimBlockGrid.y, dimBlockGrid.x, 2*bytesSharedMem>>>(dev_array, size, dev_partialMax);
 				break;
 				case KERNEL_EX3:
 					std::cout << "Kernel 03 !" << std::endl;
-					maxReduce_ex23<<<dimBlockGrid.y, dimBlockGrid.x, bytesSharedMem>>>(dev_array, size, dev_partialMax);
+					maxReduce_ex23<<<dimBlockGrid.y, dimBlockGrid.x, 2*bytesSharedMem>>>(dev_array, size, dev_partialMax);
 				break;
 				case KERNEL_EX4:
 					/// TODO EX 4
