@@ -33,6 +33,22 @@ namespace IMAC
         }
         __syncthreads();
     }
+
+	__device__
+	void cuda_fillVolatileSharedArray(volatile uint* sharedMemory, const uint* const dev_array, const uint size)
+    {
+        int localIdx = 2 * threadIdx.x;
+        int globalIdx = localIdx + 2 + blockIdx.x * blockDim.x;
+        if (globalIdx < size)
+        {
+            sharedMemory[localIdx] = dev_array[globalIdx];
+            if (globalIdx + 1 < size)
+            {
+                sharedMemory[localIdx + 1] = dev_array[globalIdx + 1];
+            }
+        }
+        __syncthreads();
+    }
 	
 	// ==================================================== EX 1
     __global__
@@ -80,9 +96,9 @@ namespace IMAC
 		for(unsigned int s = 1; s < blockDim.x; s *= 2)
         {
 			const unsigned int sIndex = localIdx;
-            int numberToProcessStep = (numberToProcess - 1) / (2 * s) + 1;
+            int numberToProcessStep = (blockDim.x - 1) / (2 * s) + 1;
             int sNext = sIndex + numberToProcessStep;
-            if (2 * sIndex >= sNext || sNext >= numberToProcess)
+            if (2 * sIndex >= sNext || sNext >= blockDim.x )
             {
                 break;
             }
@@ -93,6 +109,38 @@ namespace IMAC
 		{
 			dev_partialMax[blockIdx.x] = sharedMemory[0];
 		}
+        __syncthreads();
+    }
+
+	__global__
+    void maxReduce_ex4(const uint *const dev_array, const uint size, uint *const dev_partialMax, int warpSize)
+    {
+        extern __shared__ uint sharedMemory[];
+        volatile uint* shared_array_volatile = sharedMemory;
+        // in case size is not a power of two.
+        const int numberToProcess = cuda_getNumberToProcess(size);
+
+        cuda_fillVolatileSharedArray(shared_array_volatile, dev_array, size);
+
+		for(unsigned int s = 1; s < blockDim.x; s *= 2)
+        {
+            int numberToProcessStep = (numberToProcess - 1) / (2 * s) + 1;
+            int sIdx = threadIdx.x;
+            int sNext = sIdx + numberToProcessStep;
+            if (2 * sIdx >= sNext || sNext >= numberToProcess)
+            {
+                break;
+            }
+            shared_array_volatile[sIdx] = umax(shared_array_volatile[sIdx], shared_array_volatile[sNext]);
+            if (numberToProcessStep <= warpSize * 2)
+            {
+                __syncthreads();
+            }
+        }
+        if (threadIdx.x == 0)
+        {
+            dev_partialMax[blockIdx.x] = shared_array_volatile[0];
+        }
         __syncthreads();
     }
 
@@ -125,7 +173,8 @@ namespace IMAC
 				dimBlockGrid.x = (totalNumberThreads - 1) / dimBlockGrid.y + 1;
 			break;
 			case KERNEL_EX4:
-				/// TODO EX 4
+				dimBlockGrid.y = (totalNumberThreads - 1) / maxThreadsPerBlock + 1;
+				dimBlockGrid.x = (totalNumberThreads - 1) / dimBlockGrid.y + 1;
 			break;
 			case KERNEL_EX5:
 				/// TODO EX 5
@@ -137,6 +186,16 @@ namespace IMAC
 		
 		return dimBlockGrid;
 	}
+
+
+    int getWarp()
+    {
+        cudaDeviceProp prop;
+        int device;
+        HANDLE_ERROR(cudaGetDevice(&device));
+        HANDLE_ERROR(cudaGetDeviceProperties(&prop, device));
+        return prop.warpSize;
+    }
 
 	// Launch kernel number 'kernelType' and return float2 for timing (x:device,y:host)    
 	template<uint kernelType>
@@ -178,7 +237,7 @@ namespace IMAC
 					maxReduce_ex23<<<dimBlockGrid.y, dimBlockGrid.x, 2*bytesSharedMem>>>(dev_array, size, dev_partialMax);
 				break;
 				case KERNEL_EX4:
-					/// TODO EX 4
+					maxReduce_ex4<<<dimBlockGrid.y, dimBlockGrid.x, 2*bytesSharedMem>>>(dev_array,size,dev_partialMax,getWarp());
 					std::cout << "Not implemented !" << std::endl;
 				break;
 				case KERNEL_EX5:
