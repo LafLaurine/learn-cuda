@@ -52,9 +52,10 @@ namespace IMAC
 	__global__ void maxReduce_ex1(const uint *const dev_array, const uint size, uint *const dev_partialMax)
 	{
 		extern __shared__ uint sharedMemory[];
-		int localIdx = threadIdx.x;
-		int globalIdx = localIdx + blockIdx.x * blockDim.x;
+		const int localIdx = threadIdx.x;
+		const int globalIdx = localIdx + blockIdx.x * blockDim.x;
 
+		// Copy data in shared memory
 		if (globalIdx < size)
 			sharedMemory[localIdx] = dev_array[globalIdx];
 		else
@@ -62,17 +63,19 @@ namespace IMAC
 
 		__syncthreads();
 
+		// Apply reduce
 		for (unsigned int s = 1; s < blockDim.x; s *= 2)
 		{
+			// Strided index
 			const unsigned int sIndex = 2 * s * localIdx;
-			int sNext = sIndex + s;
+			const int sNext = sIndex + s;
 			if (sNext < blockDim.x)
-			{
-				sharedMemory[sIndex] = umax(sharedMemory[sIndex], sharedMemory[sNext]);
-			}
+				sharedMemory[sIndex] = max(sharedMemory[sIndex], sharedMemory[sNext]);
+
 			__syncthreads();
 		}
 
+		// Write result for this block
 		if (localIdx == 0)
 			dev_partialMax[blockIdx.x] = sharedMemory[0];
 	}
@@ -81,7 +84,7 @@ namespace IMAC
 	__global__ void maxReduce_ex2_3(const uint *const dev_array, const uint size, uint *const dev_partialMax)
 	{
 		extern __shared__ uint sharedMemory[];
-		int localIdx = threadIdx.x;
+		const int localIdx = threadIdx.x;
 		const int numberToProcess = cuda_getNumberToProcess(size);
 		cuda_fillsharedArray(sharedMemory, dev_array, size);
 
@@ -177,7 +180,7 @@ namespace IMAC
 		return dimBlockGrid;
 	}
 
-	int getWarp()
+	int getWarpSize()
 	{
 		cudaDeviceProp prop;
 		int device;
@@ -229,7 +232,7 @@ namespace IMAC
 				break;
 
 			case KERNEL_EX4:
-				maxReduce_ex4<<<dimBlockGrid.y, dimBlockGrid.x, 2 * bytesSharedMem>>>(dev_array, size, dev_partialMax, getWarp());
+				maxReduce_ex4<<<dimBlockGrid.y, dimBlockGrid.x, 2 * bytesSharedMem>>>(dev_array, size, dev_partialMax, getWarpSize());
 				std::cout << "Not implemented !" << std::endl;
 				break;
 
@@ -281,7 +284,7 @@ namespace IMAC
 
 		std::cout << "Test with " << nbIterations << " iterations" << std::endl;
 
-		std::cout << "========== Ex 1 " << std::endl;
+		std::cout << std::endl << "========== Ex 1 " << std::endl;
 		uint res1 = 0; // result
 		// Launch reduction and get timing
 		float2 timing1 = reduce<KERNEL_EX1>(nbIterations, dev_array, array.size(), res1);
@@ -290,7 +293,7 @@ namespace IMAC
 		printTiming(timing1);
 		compare(res1, resCPU); // Compare results
 
-		std::cout << "========== Ex 2 " << std::endl;
+		std::cout << std::endl << "========== Ex 2 " << std::endl;
 		uint res2 = 0; // result
 		// Launch reduction and get timing
 		float2 timing2 = reduce<KERNEL_EX2>(nbIterations, dev_array, array.size(), res2);
@@ -299,7 +302,7 @@ namespace IMAC
 		printTiming(timing2);
 		compare(res2, resCPU);
 
-		std::cout << "========== Ex 3 " << std::endl;
+		std::cout << std::endl << "========== Ex 3 " << std::endl;
 		uint res3 = 0; // result
 		// Launch reduction and get timing
 		float2 timing3 = reduce<KERNEL_EX3>(nbIterations, dev_array, array.size(), res3);
@@ -308,7 +311,7 @@ namespace IMAC
 		printTiming(timing3);
 		compare(res3, resCPU);
 
-		std::cout << "========== Ex 4 " << std::endl;
+		std::cout << std::endl << "========== Ex 4 " << std::endl;
 		uint res4 = 0; // result
 		// Launch reduction and get timing
 		float2 timing4 = reduce<KERNEL_EX4>(nbIterations, dev_array, array.size(), res4);
@@ -317,7 +320,7 @@ namespace IMAC
 		printTiming(timing4);
 		compare(res4, resCPU);
 
-		std::cout << "========== Ex 5 " << std::endl;
+		std::cout << std::endl << "========== Ex 5 " << std::endl;
 		uint res5 = 0; // result
 		// Launch reduction and get timing
 		float2 timing5 = reduce<KERNEL_EX5>(nbIterations, dev_array, array.size(), res5);
