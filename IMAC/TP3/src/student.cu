@@ -15,40 +15,6 @@
 
 namespace IMAC
 {
-	__device__ int cuda_getNumberToProcess(const uint arraySize)
-	{
-		return blockIdx.x == gridDim.x - 1 ? (arraySize - 1) % (2 * blockDim.x) + 1 : 2 * blockDim.x;
-	}
-
-	__device__ void cuda_fillsharedArray(uint *sharedMemory, const uint *const dev_array, const uint size)
-	{
-		int localIdx = 2 * threadIdx.x;
-		int globalIdx = localIdx + 2 + blockIdx.x * blockDim.x;
-		if (globalIdx < size)
-		{
-			sharedMemory[localIdx] = dev_array[globalIdx];
-			if (globalIdx + 1 < size)
-			{
-				sharedMemory[localIdx + 1] = dev_array[globalIdx + 1];
-			}
-		}
-		__syncthreads();
-	}
-
-	__device__ void cuda_fillVolatileSharedArray(volatile uint *sharedMemory, const uint *const dev_array, const uint size)
-	{
-		int localIdx = 2 * threadIdx.x;
-		int globalIdx = localIdx + 2 + blockIdx.x * blockDim.x;
-		if (globalIdx < size)
-		{
-			sharedMemory[localIdx] = dev_array[globalIdx];
-			if (globalIdx + 1 < size)
-				sharedMemory[localIdx + 1] = dev_array[globalIdx + 1];
-		}
-		__syncthreads();
-	}
-
-	// ==================================================== EX 1
 	__global__ void maxReduce_ex1(const uint *const dev_array, const uint size, uint *const dev_partialMax)
 	{
 		extern __shared__ uint sharedMemory[];
@@ -80,45 +46,98 @@ namespace IMAC
 			dev_partialMax[blockIdx.x] = sharedMemory[0];
 	}
 
-	// ==================================================== EX2, EX3
-	__global__ void maxReduce_ex2_3(const uint *const dev_array, const uint size, uint *const dev_partialMax)
+	__global__ void maxReduce_ex2(const uint* array, const uint size, uint* partialOut)
 	{
-		extern __shared__ uint sharedMemory[];
+		extern __shared__ uint shared[];
 		const int localIdx = threadIdx.x;
-		const int numberToProcess = cuda_getNumberToProcess(size);
-		cuda_fillsharedArray(sharedMemory, dev_array, size);
+		const int globalIdx = localIdx + blockIdx.x * blockDim.x;
 
-		for (unsigned int s = 1; s < blockDim.x; s *= 2)
-		{
-			const unsigned int sIndex = localIdx;
-			int numberToProcessStep = (blockDim.x - 1) / (2 * s) + 1;
-			int sNext = sIndex + numberToProcessStep;
-			if (2 * sIndex >= sNext || sNext >= blockDim.x)
-				break;
-
-			sharedMemory[sIndex] = umax(sharedMemory[sIndex], sharedMemory[sNext]);
-			__syncthreads();
-		}
-		if (localIdx == 0)
-			dev_partialMax[blockIdx.x] = sharedMemory[0];
+		// Copy data in shared memory
+		if (globalIdx < size)
+			shared[localIdx] = array[globalIdx];
+		else
+			shared[localIdx] = 0;
 
 		__syncthreads();
+
+		// Apply reduce
+		for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1)
+		{
+			if (localIdx < s)
+				shared[localIdx] = max(shared[localIdx], shared[localIdx + s]);
+
+			__syncthreads();
+		}
+
+		// Write result for this block
+		if (localIdx == 0) 
+			partialOut[blockIdx.x] = shared[0];
+	}
+
+	__global__ void maxReduce_ex3(const uint* array, const uint size, uint* partialOut)
+	{
+		extern __shared__ uint shared[];
+		const int localIdx = threadIdx.x;
+		const int globalIdx = localIdx + blockIdx.x * blockDim.x * 2;
+
+		// Copy data in shared memory
+		if (globalIdx < size)
+		{
+			shared[localIdx] = array[globalIdx];
+			if (globalIdx + blockDim.x < size)
+				shared[localIdx] = max(shared[localIdx], array[globalIdx + blockDim.x]);
+		} 
+		else
+		{
+			shared[localIdx] = 0;
+		}
+
+		__syncthreads();
+
+		// Apply reduce
+		for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1)
+		{
+			if (localIdx < s)
+				shared[localIdx] = max(shared[localIdx], shared[localIdx + s]);
+
+			__syncthreads();
+		}
+
+		// Write result for this block
+		if (localIdx == 0) 
+			partialOut[blockIdx.x] = shared[0];
+	}
+
+	__device__ int cuda_getNumberToProcess(const uint arraySize)
+	{
+		return blockIdx.x == gridDim.x - 1 ? (arraySize - 1) % (2 * blockDim.x) + 1 : 2 * blockDim.x;
 	}
 
 	__global__ void maxReduce_ex4(const uint *const dev_array, const uint size, uint *const dev_partialMax, int warpSize)
 	{
 		extern __shared__ uint sharedMemory[];
 		volatile uint *shared_array_volatile = sharedMemory;
+
 		// in case size is not a power of two.
 		const int numberToProcess = cuda_getNumberToProcess(size);
 
-		cuda_fillVolatileSharedArray(shared_array_volatile, dev_array, size);
+		// Copy data in shared memory
+		const int localIdx = 2 * threadIdx.x;
+		const int globalIdx = localIdx + 2 + blockIdx.x * blockDim.x;
+		if (globalIdx < size)
+		{
+			sharedMemory[localIdx] = dev_array[globalIdx];
+			if (globalIdx + 1 < size)
+				sharedMemory[localIdx + 1] = dev_array[globalIdx + 1];
+		}
+		__syncthreads();
 
+		// Apply reduce
 		for (unsigned int s = 1; s < blockDim.x; s *= 2)
 		{
-			int numberToProcessStep = (numberToProcess - 1) / (2 * s) + 1;
-			int sIdx = threadIdx.x;
-			int sNext = sIdx + numberToProcessStep;
+			const int numberToProcessStep = (numberToProcess - 1) / (2 * s) + 1;
+			const int sIdx = threadIdx.x;
+			const int sNext = sIdx + numberToProcessStep;
 			if (2 * sIdx >= sNext || sNext >= numberToProcess)
 				break;
 
@@ -126,10 +145,10 @@ namespace IMAC
 			if (numberToProcessStep <= warpSize * 2)
 				__syncthreads();
 		}
+
+		// Write result for this block
 		if (threadIdx.x == 0)
 			dev_partialMax[blockIdx.x] = shared_array_volatile[0];
-
-		__syncthreads();
 	}
 
 	// return a uint2 with x: dimBlock / y: dimGrid
@@ -223,12 +242,12 @@ namespace IMAC
 
 			case KERNEL_EX2:
 				std::cout << "Kernel 02 !" << std::endl;
-				maxReduce_ex2_3<<<dimBlockGrid.y, dimBlockGrid.x, 2 * bytesSharedMem>>>(dev_array, size, dev_partialMax);
+				maxReduce_ex2<<<dimBlockGrid.y, dimBlockGrid.x, 2 * bytesSharedMem>>>(dev_array, size, dev_partialMax);
 				break;
 
 			case KERNEL_EX3:
 				std::cout << "Kernel 03 !" << std::endl;
-				maxReduce_ex2_3<<<dimBlockGrid.y, dimBlockGrid.x, 2 * bytesSharedMem>>>(dev_array, size, dev_partialMax);
+				maxReduce_ex3<<<dimBlockGrid.y, dimBlockGrid.x, 2 * bytesSharedMem>>>(dev_array, size, dev_partialMax);
 				break;
 
 			case KERNEL_EX4:
